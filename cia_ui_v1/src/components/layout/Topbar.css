@@ -1,0 +1,142 @@
+/* =============================================
+   Topbar.css
+   Layout: sticky top navigation bar
+============================================== */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--topbar-h);
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 0 24px;
+}
+
+/* -- Brand -- */
+.tb-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -.01em;
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+/* -- Search -- */
+.tb-search {
+  flex: 1;
+  max-width: 680px;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tb-search svg {
+  position: absolute;
+  left: 14px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.tb-search input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 14px 0 42px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  outline: none;
+}
+
+.tb-search input::color-placeholder { color: var(--faint); }
+.tb-search input::placeholder { color: var(--faint); }
+.tb-search input:focus {
+  border-color: #cdd2da;
+  box-shadow: 0 0 0 3px rgba(108,92,240,.08);
+}
+
+/* -- Right cluster -- */
+.tb-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* mode pill */
+.tb-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 10px 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid var(--line);
+}
+.tb-mode-pill:hover { background: var(--soft); }
+.tb-mode-pill svg { color: var(--muted); }
+
+/* icon buttons */
+.tb-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+  border-radius: 9px;
+  cursor: pointer;
+}
+.tb-icon-btn:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+.tb-icon-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* avatar */
+.tb-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #1f2733;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+@media (max-width: 720px) {
+  .tb-search { display: none; }
+}
