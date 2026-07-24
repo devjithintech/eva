@@ -1,0 +1,710 @@
+<title>LightHouse · Candidate Intelligence — Demo Brief</title>
+<meta name="description" content="Talk to it, and the right diligence view assembles itself — the technology behind it and why each piece is there." />
+<style>
+  :root {
+    --navy: #0a2a4a;
+    --navy-deep: #07203a;
+    --ink: #112a44;
+    --ink-soft: #51647a;
+    --ink-faint: #8497ab;
+    --paper: #f6f8fb;
+    --panel: #ffffff;
+    --band-1: #98caea;
+    --band-2: #6aaae4;
+    --band-3: #082f57;
+    --violet: #6354f2;
+    --violet-soft: #efedfe;
+    --line: #e3eaf2;
+    --line-strong: #cfd9e6;
+    --gold: #b7843a;
+    --good: #15976a;
+
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+    --maxw: 1160px;
+    --gut: 0px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0 40px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gut); }
+  .col { max-width: 720px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--violet); margin: 0 0 18px; display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before { content: ""; width: 26px; height: 1px; background: currentColor; opacity: 0.55; }
+
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; text-wrap: balance; letter-spacing: -0.01em; }
+
+  /* ── Hero ─────────────────────────────────────────────── */
+  .hero {
+    background:
+      radial-gradient(130% 120% at 94% 0%, rgba(99, 84, 242, 0.32), transparent 50%),
+      radial-gradient(90% 90% at 4% 100%, rgba(106, 170, 228, 0.16), transparent 55%),
+      linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color: #eaf1f8;
+    padding: 64px 0 70px;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1.04fr 0.96fr; gap: 60px; align-items: center; }
+  .hero .eyebrow { color: var(--band-1); }
+  .mark { display: flex; align-items: center; gap: 13px; margin-bottom: 40px; }
+  .mark span { font-family: var(--sans); font-weight: 700; font-size: 18px; letter-spacing: -0.02em; color: #fff; }
+  .hero h1 { font-size: clamp(33px, 4.5vw, 52px); line-height: 1.05; margin: 0 0 22px; color: #fff; }
+  .hero h1 .accent { font-style: italic; color: var(--band-1); }
+  .hero .lede { font-size: clamp(17px, 2vw, 20px); line-height: 1.55; color: #b6c9db; max-width: 540px; margin: 0; }
+  .caps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .caps span { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: #b6c9db; border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 5px 11px; }
+  .meta { margin-top: 34px; padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, 0.14); display: flex; flex-wrap: wrap; gap: 16px 36px; }
+  .meta div { display: flex; flex-direction: column; gap: 3px; }
+  .meta dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7f97ad; }
+  .meta dd { margin: 0; font-size: 15px; color: #dce7f1; font-weight: 500; }
+
+  /* ── Listening / conversation visual ──────────────────── */
+  .listen {
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 22px; padding: 24px 24px 22px;
+    backdrop-filter: blur(8px); box-shadow: 0 34px 80px -34px rgba(0, 0, 0, 0.65);
+  }
+  .listen-head { display: flex; align-items: center; gap: 16px; }
+  .orb-stage { position: relative; width: 62px; height: 62px; flex: none; display: grid; place-items: center; }
+  .orb {
+    position: relative; z-index: 2; width: 50px; height: 50px; border-radius: 50%;
+    background: radial-gradient(120% 120% at 30% 25%, #8b7cf8, var(--violet) 60%, #4b3fd6);
+    display: grid; place-items: center; box-shadow: 0 8px 22px -6px rgba(99, 84, 242, 0.85);
+  }
+  .ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgba(139, 124, 248, 0.55); }
+  .meter { display: flex; align-items: flex-end; gap: 4px; height: 28px; }
+  .meter span { width: 4px; border-radius: 2px; background: linear-gradient(180deg, var(--band-1), var(--violet)); transform-origin: bottom; height: 100%; }
+  .listen-label { margin-left: auto; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9fd0f0; display: flex; align-items: center; gap: 7px; }
+  .listen-label i { width: 7px; height: 7px; border-radius: 50%; background: #38d39f; }
+  .wave-wrap { margin: 18px 0 16px; border-radius: 12px; overflow: hidden; }
+  canvas#wave { display: block; width: 100%; height: 84px; }
+
+  .convo { display: flex; flex-direction: column; gap: 11px; min-height: 104px; }
+  .line { display: flex; gap: 10px; align-items: flex-start; font-size: 15.5px; line-height: 1.45; }
+  .line .who { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7f97ad; padding-top: 4px; flex: none; width: 30px; }
+  .line.you #tx { color: #f1f6fb; }
+  .line.ai { opacity: 0; transition: opacity 0.35s ease; }
+  .line.ai .aidot { width: 16px; height: 16px; border-radius: 50%; flex: none; margin-top: 2px; background: conic-gradient(from 0deg, #fde68a, #f9a8d4, #a5b4fc, #86efac, #fde68a); }
+  .line.ai #ans { color: #c2d4e6; }
+  .caret { display: inline-block; width: 2px; height: 1.05em; background: var(--band-1); vertical-align: -2px; margin-left: 2px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ring.r1 { animation: pulse 2.6s ease-out infinite; }
+    .ring.r2 { animation: pulse 2.6s ease-out infinite 0.8s; }
+    .ring.r3 { animation: pulse 2.6s ease-out infinite 1.6s; }
+    @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.7; } 100% { transform: scale(1.7); opacity: 0; } }
+    .meter span { animation: eq 0.9s ease-in-out infinite; }
+    .meter span:nth-child(2) { animation-delay: 0.12s; } .meter span:nth-child(3) { animation-delay: 0.24s; }
+    .meter span:nth-child(4) { animation-delay: 0.36s; } .meter span:nth-child(5) { animation-delay: 0.48s; } .meter span:nth-child(6) { animation-delay: 0.6s; }
+    @keyframes eq { 0%, 100% { transform: scaleY(0.28); } 50% { transform: scaleY(1); } }
+    .listen-label i { animation: live 2s ease-out infinite; }
+    @keyframes live { 0% { box-shadow: 0 0 0 0 rgba(56, 211, 159, 0.5); } 70% { box-shadow: 0 0 0 9px rgba(56, 211, 159, 0); } 100% { box-shadow: 0 0 0 0 rgba(56, 211, 159, 0); } }
+    .caret { animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0; } }
+    .reveal { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+    .reveal.d1 { animation-delay: 0.08s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  }
+
+  /* ── Sections ─────────────────────────────────────────── */
+  section { padding: 70px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: 0; }
+  h2 { font-size: clamp(25px, 3.2vw, 33px); line-height: 1.12; margin: 0 0 20px; color: var(--ink); }
+  .col p { color: var(--ink-soft); margin: 0 0 18px; }
+  .col p:last-child { margin-bottom: 0; }
+  .col p strong { color: var(--ink); font-weight: 600; }
+  .pull { font-family: var(--serif); font-size: clamp(20px, 2.4vw, 25px); line-height: 1.42; color: var(--ink); }
+  .pull em { font-style: italic; color: var(--violet); }
+
+  /* ── Data-flow pipeline ───────────────────────────────── */
+  .pipe-band { margin-top: 36px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px 20px; overflow-x: auto; }
+  .pipe { display: flex; align-items: stretch; gap: 0; min-width: max-content; }
+  .node { display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; padding: 4px 6px; width: 124px; }
+  .node .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--violet-soft); color: var(--violet); border: 1px solid #ddd7fb; }
+  .node .nm { font-size: 12.5px; font-weight: 600; color: var(--ink); line-height: 1.25; }
+  .node .sub { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.04em; }
+  .arrow { align-self: center; color: var(--line-strong); flex: none; margin-top: -14px; }
+  .node.alt .ic { background: rgba(21,151,106,0.09); color: var(--good); border-color: rgba(21,151,106,0.25); }
+
+  /* ── Tech cards ───────────────────────────────────────── */
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 38px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; }
+  .card .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+  .card h3 { font-size: 20px; margin: 9px 0 10px; color: var(--ink); }
+  .card > p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+  .card em { font-style: normal; color: var(--violet); font-weight: 600; }
+  .card .why { margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line-strong); display: flex; gap: 10px; align-items: baseline; }
+  .card .why b { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--good); flex: none; }
+  .card .why span { font-size: 14.5px; color: var(--ink); }
+
+  /* ── Trust list ───────────────────────────────────────── */
+  .trust { display: grid; gap: 16px; margin: 30px 0 0; padding: 0; }
+  .trust li { list-style: none; display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start; }
+  .trust .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); margin-top: 9px; }
+  .trust b { color: var(--ink); font-weight: 600; }
+  .trust p { margin: 2px 0 0; color: var(--ink-soft); font-size: 15px; }
+
+  /* ── Stack grid (icon + why) ──────────────────────────── */
+  .stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(312px, 1fr)); gap: 16px; margin-top: 34px; }
+  .tech { display: grid; grid-template-columns: 48px 1fr; gap: 16px; align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .tech .ic { width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; background: var(--violet-soft); color: var(--violet); border: 1px solid #e1dcfb; }
+  .tech.b1 .ic { background: #eaf4fc; color: #2f7bc0; border-color: #d6e8f7; }
+  .tech.b2 .ic { background: rgba(21,151,106,0.09); color: var(--good); border-color: rgba(21,151,106,0.22); }
+  .tech.b3 .ic { background: #f7efe1; color: var(--gold); border-color: #ecdfc8; }
+  .tech .nm { font-size: 16px; font-weight: 700; color: var(--ink); display: flex; align-items: baseline; gap: 8px; }
+  .tech .nm small { font-family: var(--mono); font-size: 10.5px; font-weight: 400; color: var(--ink-faint); letter-spacing: 0.04em; }
+  .tech .why { margin: 4px 0 0; font-size: 14.5px; color: var(--ink-soft); line-height: 1.5; }
+
+  /* ── Close ────────────────────────────────────────────── */
+  .close { background: var(--navy); color: #eaf1f8; border-radius: 20px; padding: 46px 44px; }
+  .close h2 { color: #fff; margin-bottom: 14px; }
+  .close > p { color: #b6c9db; margin: 0 0 26px; max-width: 560px; }
+  .close .list { display: flex; flex-wrap: wrap; gap: 12px 30px; padding: 0; margin: 0; }
+  .close .list li { list-style: none; font-size: 15px; color: #dce7f1; display: flex; align-items: center; gap: 10px; }
+  .close .list li::before { content: ""; width: 16px; height: 2px; background: var(--band-2); flex: none; }
+  footer { padding: 32px 0 60px; color: var(--ink-faint); font-size: 13px; font-family: var(--mono); }
+
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    .cards { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    body { margin: 0 20px; }
+    .close { padding: 34px 24px; }
+    section { padding: 52px 0; }
+  }
+</style>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <div class="mark">
+        <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true" style="border-radius:50%;box-shadow:0 2px 10px rgba(8,47,87,.5)">
+          <clipPath id="c"><circle cx="14" cy="14" r="14"/></clipPath>
+          <g clip-path="url(#c)"><rect width="28" height="9" fill="#98CAEA"/><rect y="9" width="28" height="9" fill="#6AAAE4"/><rect y="18" width="28" height="10" fill="#082F57"/></g>
+        </svg>
+        <span>LightHouse</span>
+      </div>
+      <p class="eyebrow">Candidate Intelligence · Demo Brief</p>
+      <h1>Talk to your data.<br />The right view <span class="accent">assembles itself.</span></h1>
+      <p class="lede">A conversational analyst you can speak to. It transcribes, reasons, answers in plain language, and builds the exact diligence view — live, grounded in your own numbers.</p>
+      <div class="caps">
+        <span>Voice in</span><span>Streamed answers</span><span>Generative UI</span><span>Model-agnostic</span>
+      </div>
+      <dl class="meta">
+        <div><dt>Prepared for</dt><dd>Investment Committee</dd></div>
+        <div><dt>The demo</dt><dd>Live, ~10 minutes</dd></div>
+        <div><dt>Default model</dt><dd>Claude · swappable</dd></div>
+      </dl>
+    </div>
+
+    <!-- Talk-to-it visual: listening + two-way conversation -->
+    <div class="listen reveal d1" role="img" aria-label="Speaking to the assistant: a question is transcribed live and answered in real time">
+      <div class="listen-head">
+        <div class="orb-stage">
+          <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+          <div class="orb">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          </div>
+        </div>
+        <div class="meter"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="listen-label"><i></i> Listening</div>
+      </div>
+
+      <div class="wave-wrap"><canvas id="wave" width="900" height="168"></canvas></div>
+
+      <div class="convo">
+        <div class="line you"><span class="who">You</span><span id="tx"></span><span class="caret" id="caretY"></span></div>
+        <div class="line ai" id="aiLine"><span class="aidot"></span><span id="ans"></span><span class="caret" id="caretA" style="display:none"></span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="col">
+      <p class="eyebrow">The shift</p>
+      <h2>Your team doesn't want another dashboard. They want a conversation.</h2>
+      <p>Today, evaluating a candidate means hunting through tabs — returns here, risk flags there, peer correlations somewhere else — and stitching the picture together by hand. The tool makes you do the assembly.</p>
+      <p class="pull">We flip it. You <em>ask out loud</em>, the way you'd ask a colleague — and the interface builds the answer in front of you: the relevant chart, table, or scorecard, composed on demand and grounded in your own data.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col">
+      <p class="eyebrow">What you'll see</p>
+      <h2>How a question becomes a view</h2>
+      <p>This is the full loop the demo walks through — from a spoken question to a fully assembled, decision-ready artifact.</p>
+    </div>
+    <div class="flow" style="display:grid;margin-top:40px">
+      <div class="step" style="display:grid;grid-template-columns:56px 1fr;gap:24px;padding:26px 0;border-top:1px solid var(--line-strong);align-items:start">
+        <div style="font-family:var(--serif);font-size:28px;color:var(--violet);text-align:right;font-variant-numeric:tabular-nums">01</div>
+        <div><h3 style="font-size:19px;margin:2px 0 6px">Speak, and it listens</h3><p style="margin:0;color:var(--ink-soft);font-size:15.5px">Ask out loud or type — no filters, no menus, no query syntax. The question is transcribed live.</p><span style="display:inline-block;margin-top:12px;font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--violet-soft);border:1px solid #ddd7fb;border-radius:8px;padding:8px 12px">“How does ANDA Cruise stack up against our standard benchmarks?”</span></div>
+      </div>
+      <div class="step" style="display:grid;grid-template-columns:56px 1fr;gap:24px;padding:26px 0;border-top:1px solid var(--line);align-items:start">
+        <div style="font-family:var(--serif);font-size:28px;color:var(--violet);text-align:right;font-variant-numeric:tabular-nums">02</div>
+        <div><h3 style="font-size:19px;margin:2px 0 6px">The analyst answers as it thinks</h3><p style="margin:0;color:var(--ink-soft);font-size:15.5px">A concise, senior-level read streams back word by word — the interpretation, not just the numbers.</p></div>
+      </div>
+      <div class="step" style="display:grid;grid-template-columns:56px 1fr;gap:24px;padding:26px 0;border-top:1px solid var(--line);align-items:start">
+        <div style="font-family:var(--serif);font-size:28px;color:var(--violet);text-align:right;font-variant-numeric:tabular-nums">03</div>
+        <div><h3 style="font-size:19px;margin:2px 0 6px">The canvas assembles the view</h3><p style="margin:0;color:var(--ink-soft);font-size:15.5px">The exact artifact the question calls for — a correlation matrix, a comparison, a committee scorecard — builds itself beside the answer, populated from trusted figures.</p></div>
+      </div>
+      <div class="step" style="display:grid;grid-template-columns:56px 1fr;gap:24px;padding:26px 0;border-top:1px solid var(--line);align-items:start">
+        <div style="font-family:var(--serif);font-size:28px;color:var(--violet);text-align:right;font-variant-numeric:tabular-nums">04</div>
+        <div><h3 style="font-size:19px;margin:2px 0 6px">Decide — together, live</h3><p style="margin:0;color:var(--ink-soft);font-size:15.5px">Pull colleagues into the same session, switch the underlying AI model on the fly, and advance a candidate to interview from the scorecard.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col">
+      <p class="eyebrow">Under the hood</p>
+      <h2>How it actually connects</h2>
+      <p>Your voice never goes straight to a model. It travels a typed, event-streamed pipeline you control end to end — keys held server-side, numbers sourced from your data, the model interchangeable at any hop.</p>
+    </div>
+    <div class="pipe-band">
+      <div class="pipe">
+        <div class="node">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+          <div class="nm">Voice / text</div><div class="sub">you ask</div>
+        </div>
+        <Arrow></Arrow>
+        <div class="node">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="2.4"/><circle cx="19" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M7.3 11 16.7 6.7M7.3 13l9.4 4.3"/></svg></div>
+          <div class="nm">AG-UI run</div><div class="sub">SSE events</div>
+        </div>
+        <Arrow></Arrow>
+        <div class="node">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><circle cx="7" cy="7" r="0.7" fill="currentColor"/><circle cx="7" cy="17" r="0.7" fill="currentColor"/></svg></div>
+          <div class="nm">Agent server</div><div class="sub">Express · keys</div>
+        </div>
+        <Arrow></Arrow>
+        <div class="node alt">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2c.4 5.3 4.5 9.4 9.8 9.8C16.5 12.2 12.4 16.3 12 21.6 11.6 16.3 7.5 12.2 2.2 11.8 7.5 11.4 11.6 7.3 12 2Z"/></svg></div>
+          <div class="nm">Model</div><div class="sub">Claude ⇄ …</div>
+        </div>
+        <Arrow></Arrow>
+        <div class="node">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h11l-3-3M20 17H9l3 3"/></svg></div>
+          <div class="nm">Tool calls</div><div class="sub">choose view</div>
+        </div>
+        <Arrow></Arrow>
+        <div class="node">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg></div>
+          <div class="nm">Typed artifacts</div><div class="sub">React canvas</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .dd-grid { display: grid; gap: 18px; margin-top: 36px; }
+    .dd-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+    .dd-card .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 5px; }
+    .dd-card h3 { font-size: 18px; margin: 0 0 5px; color: var(--ink); }
+    .dd-card .desc { font-size: 14px; color: var(--ink-soft); margin: 0 0 20px; max-width: 640px; }
+    .dd-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+    .arch { display: grid; grid-template-columns: 1fr 70px 1fr 70px 1fr; align-items: center; gap: 6px; }
+    .layer { border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; background: var(--paper); align-self: stretch; }
+    .layer .lt { font-size: 13px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+    .layer .lt i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .layer ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+    .layer li { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); padding-left: 13px; position: relative; line-height: 1.4; }
+    .layer li::before { content: ""; position: absolute; left: 0; top: 6px; width: 5px; height: 5px; border-radius: 1px; background: var(--line-strong); }
+    .conn { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--ink-faint); }
+    .conn .fw, .conn .bk { font-family: var(--mono); font-size: 9px; letter-spacing: 0.02em; white-space: nowrap; }
+    .conn .bk { color: var(--violet); }
+    .conn svg { color: var(--line-strong); }
+
+    .events { overflow-x: auto; padding-bottom: 4px; }
+    .evrow { display: flex; align-items: stretch; gap: 8px; min-width: max-content; }
+    .grp { border-radius: 12px; padding: 10px 11px 11px; display: flex; flex-direction: column; gap: 7px; border: 1px solid; }
+    .grp .gl { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+    .ev { font-family: var(--mono); font-size: 11px; font-weight: 600; background: var(--panel); border-radius: 7px; padding: 6px 9px; white-space: nowrap; color: var(--ink); }
+    .g-run { background: rgba(21,151,106,0.08); border-color: rgba(21,151,106,0.25); } .g-run .gl { color: var(--good); }
+    .g-txt { background: #eef5fc; border-color: #d8e7f6; } .g-txt .gl { color: #2f7bc0; }
+    .g-tool { background: var(--violet-soft); border-color: #ddd7fb; } .g-tool .gl { color: var(--violet); }
+    .gt { align-self: center; color: var(--line-strong); font-size: 17px; }
+    .legend { display: flex; gap: 16px; margin-top: 14px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); flex-wrap: wrap; }
+    .legend span { display: flex; align-items: center; gap: 6px; } .legend i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+    .lat-axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-faint); margin: 0 0 12px; }
+    .lat-row { margin-bottom: 20px; } .lat-row:last-child { margin-bottom: 0; }
+    .lat-row .h { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink); margin-bottom: 8px; }
+    .lat-row .h span { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+    .lat-track { position: relative; padding-top: 18px; }
+    .lat-bar { position: relative; height: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+    .seg { position: absolute; top: 0; bottom: 0; transform-origin: left; }
+    .flag { position: absolute; top: 18px; bottom: 0; width: 2px; background: var(--good); z-index: 2; }
+    .flag b { position: absolute; top: -15px; left: 0; transform: translateX(-50%); font-family: var(--mono); font-size: 9px; color: var(--good); white-space: nowrap; font-weight: 600; }
+
+    .fan svg { width: 100%; height: auto; display: block; }
+    .flow-i { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .fi { font-family: var(--mono); font-size: 11.5px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; color: var(--ink); line-height: 1.3; }
+    .fi.src { border-color: #ddd7fb; background: var(--violet-soft); color: var(--violet); }
+    .fi.gov { border-color: rgba(21,151,106,0.3); background: rgba(21,151,106,0.08); color: var(--good); }
+    .flow-i .ar { color: var(--line-strong); flex: none; }
+    .note { margin: 14px 0 0; font-size: 12px; color: var(--ink-faint); font-family: var(--mono); line-height: 1.5; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .seg.anim { animation: barGrow 0.95s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+      @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    }
+    @media (max-width: 860px) {
+      .arch { grid-template-columns: 1fr; }
+      .conn { flex-direction: row; gap: 10px; padding: 4px 0; }
+      .conn svg { transform: rotate(90deg); }
+      .dd-row { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <section>
+    <div class="col">
+      <p class="eyebrow">Technical deep-dive</p>
+      <h2>For the engineers in the room</h2>
+      <p>The same system, drawn four ways — the layers it runs in, the exact event stream behind one question, why streaming changes the felt latency, and how the model stays swappable without ever touching your data.</p>
+    </div>
+
+    <div class="dd-grid">
+      <!-- 01 · Architecture -->
+      <div class="dd-card">
+        <p class="lbl">01 · Architecture</p>
+        <h3>Three layers — and your keys live in the middle one</h3>
+        <p class="desc">The browser only ever talks to your own server. Credentials, data access, and model calls all stay server-side.</p>
+        <div class="arch">
+          <div class="layer">
+            <div class="lt"><i style="background:var(--violet)"></i>Browser · React</div>
+            <ul><li>Chat panel</li><li>Generative canvas</li><li>useAguiAgent() hook</li><li>Model switcher</li><li>Voice capture</li></ul>
+          </div>
+          <div class="conn"><span class="fw">POST /agent →</span><svg width="40" height="16" viewBox="0 0 40 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h32M29 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bk">← SSE events</span></div>
+          <div class="layer">
+            <div class="lt"><i style="background:#2f7bc0"></i>Agent server · Express</div>
+            <ul><li>AG-UI runner + encoder</li><li>Provider abstraction</li><li>Tool executors</li><li>Governed data layer</li><li>API keys (never exposed)</li></ul>
+          </div>
+          <div class="conn"><span class="fw">stream chat →</span><svg width="40" height="16" viewBox="0 0 40 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h32M29 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bk">← tokens · tools</span></div>
+          <div class="layer">
+            <div class="lt"><i style="background:var(--gold)"></i>Models</div>
+            <ul><li>Claude · default</li><li>OpenAI</li><li>Gemini</li><li>Mock · keyless</li></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- 02 · Event stream -->
+      <div class="dd-card">
+        <p class="lbl">02 · One run, event by event</p>
+        <h3>The AG-UI stream behind a single question</h3>
+        <p class="desc">Every answer is a typed, ordered event stream — the spoken reply and the on-screen view arrive as distinct, inspectable events.</p>
+        <div class="events">
+          <div class="evrow">
+            <div class="grp g-run"><span class="gl">lifecycle</span><div class="ev">RUN_STARTED</div></div>
+            <span class="gt">›</span>
+            <div class="grp g-txt"><span class="gl">spoken answer streams</span><div class="ev">TEXT_MESSAGE_START</div><div class="ev">…_CONTENT ×N</div><div class="ev">TEXT_MESSAGE_END</div></div>
+            <span class="gt">›</span>
+            <div class="grp g-tool"><span class="gl">view assembles</span><div class="ev">TOOL_CALL_START</div><div class="ev">TOOL_CALL_ARGS</div><div class="ev">TOOL_CALL_END</div></div>
+            <span class="gt">›</span>
+            <div class="grp g-run"><span class="gl">done</span><div class="ev">RUN_FINISHED</div></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>lifecycle</span>
+          <span><i style="background:#2f7bc0"></i>text · the spoken answer</span>
+          <span><i style="background:var(--violet)"></i>tool · the generative UI</span>
+        </div>
+      </div>
+
+      <!-- 03 · Latency -->
+      <div class="dd-card">
+        <p class="lbl">03 · Why streaming wins</p>
+        <h3>Time to first insight</h3>
+        <p class="desc">A traditional screen computes everything, then paints once. We stream — the first words land in under half a second, and the view assembles as it goes.</p>
+        <div class="lat-axis"><span>0s</span><span>1s</span><span>2s</span><span>3s</span></div>
+        <div class="lat-row">
+          <div class="h"><b>Traditional dashboard</b><span>first insight ≈ 3.0s</span></div>
+          <div class="lat-track">
+            <div class="lat-bar">
+              <div class="seg anim" style="left:0;width:88%;background:var(--line-strong)"></div>
+              <div class="seg anim" style="left:88%;width:12%;background:var(--ink-faint)"></div>
+            </div>
+            <div class="flag" style="left:99%"><b style="transform:translateX(-100%)">renders at end</b></div>
+          </div>
+        </div>
+        <div class="lat-row">
+          <div class="h"><b>LightHouse · streamed</b><span>first insight ≈ 0.4s</span></div>
+          <div class="lat-track">
+            <div class="lat-bar">
+              <div class="seg anim" style="left:0;width:12%;background:var(--violet)"></div>
+              <div class="seg anim" style="left:12%;width:71%;background:linear-gradient(90deg,var(--violet),var(--band-2))"></div>
+            </div>
+            <div class="flag" style="left:12%"><b>first words 0.4s</b></div>
+            <div class="flag" style="left:83%;background:var(--band-2)"><b style="color:var(--band-2)">full view 2.5s</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dd-row">
+        <!-- 04 · Model-agnostic -->
+        <div class="dd-card fan">
+          <p class="lbl">04 · Model-agnostic core</p>
+          <h3>One contract, any model behind it</h3>
+          <p class="desc">Providers sit behind a single interface — switched live, even mid-session.</p>
+          <svg viewBox="0 0 460 200" role="img" aria-label="One provider interface fanning out to four models">
+            <g fill="none" stroke-width="2">
+              <path d="M160 100 C 230 100 230 38 300 38" style="stroke:var(--violet)"/>
+              <path d="M160 100 C 230 100 230 84 300 84" style="stroke:var(--line-strong)"/>
+              <path d="M160 100 C 230 100 230 130 300 130" style="stroke:var(--line-strong)"/>
+              <path d="M160 100 C 230 100 230 176 300 176" style="stroke:var(--line-strong)"/>
+            </g>
+            <rect x="14" y="80" width="146" height="40" rx="10" style="fill:var(--violet-soft);stroke:#ddd7fb"/>
+            <text x="87" y="97" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" font-weight="700" style="fill:var(--violet)">LLMProvider</text>
+            <text x="87" y="111" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" style="fill:var(--ink-soft)">interface</text>
+            <g font-family="ui-monospace,monospace" font-size="11.5">
+              <rect x="300" y="23" width="150" height="30" rx="8" style="fill:var(--panel);stroke:var(--violet);stroke-width:1.5"/>
+              <text x="315" y="42" font-weight="700" style="fill:var(--violet)">✦ Claude · default</text>
+              <rect x="300" y="69" width="150" height="30" rx="8" style="fill:var(--panel);stroke:var(--line-strong)"/>
+              <text x="315" y="88" style="fill:var(--ink)">OpenAI</text>
+              <rect x="300" y="115" width="150" height="30" rx="8" style="fill:var(--panel);stroke:var(--line-strong)"/>
+              <text x="315" y="134" style="fill:var(--ink)">Gemini</text>
+              <rect x="300" y="161" width="150" height="30" rx="8" style="fill:var(--panel);stroke:var(--line-strong)"/>
+              <text x="315" y="180" style="fill:var(--ink-soft)">Mock · keyless</text>
+            </g>
+          </svg>
+          <p class="note">Switch live via <span style="color:var(--violet)">forwardedProps.model</span> — no rebuild.</p>
+        </div>
+
+        <!-- 05 · Data integrity -->
+        <div class="dd-card">
+          <p class="lbl">05 · Data integrity</p>
+          <h3>The model names the view — never the numbers</h3>
+          <p class="desc">It chooses which artifact to render; the figures are read from your data on the server.</p>
+          <div class="flow-i">
+            <span class="fi src">Model · picks the view</span>
+            <svg class="ar" width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h16M14 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="fi gov">Server · injects governed numbers</span>
+            <svg class="ar" width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h16M14 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="fi">Typed payload</span>
+            <svg class="ar" width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h16M14 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="fi">React canvas</span>
+          </div>
+          <p class="note">Result: every figure on screen traces to your source — the AI can't fabricate a return or a Sharpe ratio.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col">
+      <p class="eyebrow">The technology — and why it matters to you</p>
+      <h2>Modern foundations, chosen for trust and longevity</h2>
+      <p>Every piece earns its place against a question your committee would ask: can we trust it, will it last, and does it lock us in?</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="tag">Generative UI · AG-UI protocol</div>
+        <h3>An interface that composes itself</h3>
+        <p>Built on AG-UI, the open standard for agent-to-application communication. The agent doesn't return text it hopes you'll read — it emits typed events that drive real, interactive components.</p>
+        <div class="why"><b>Why</b><span>Diligence in seconds, not tab-hunting — on an open standard with no proprietary dead end.</span></div>
+      </div>
+      <div class="card">
+        <div class="tag">Model-agnostic core</div>
+        <h3>Claude today, anything tomorrow</h3>
+        <p>The AI provider sits behind a clean abstraction. Claude (Anthropic) is the default; Gemini and OpenAI are a one-line switch — selectable live, even mid-session.</p>
+        <div class="why"><b>Why</b><span>No vendor lock-in. Best or cheapest model per task, and next year's models drop in without a rebuild.</span></div>
+      </div>
+      <div class="card">
+        <div class="tag">Data integrity by design</div>
+        <h3>The AI chooses the view, never the numbers</h3>
+        <p>The model decides <em>which</em> view to render and for which funds. Every figure is sourced from your governed dataset on the server — the AI cannot invent a return or a Sharpe ratio.</p>
+        <div class="why"><b>Why</b><span>Defensible, audit-ready output — essential when a number drives an allocation.</span></div>
+      </div>
+      <div class="card">
+        <div class="tag">Real-time streaming</div>
+        <h3>Live answers, live collaboration</h3>
+        <p>Server-Sent Events stream tokens and views the moment they're produced. Colleagues join the same session to evaluate a candidate together in real time.</p>
+        <div class="why"><b>Why</b><span>Matches how committees actually work — shared context, faster consensus.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col">
+      <p class="eyebrow">Built for an allocator</p>
+      <h2>Trust isn't a feature we added. It's the architecture.</h2>
+      <ul class="trust">
+        <li><span class="dot"></span><div><b>Your keys never touch the browser.</b><p>All AI credentials live server-side; the interface only ever talks to your own backend.</p></div></li>
+        <li><span class="dot"></span><div><b>Numbers trace back to your source.</b><p>Artifacts are populated from your data layer, not model memory — every figure on screen is one you can stand behind.</p></div></li>
+        <li><span class="dot"></span><div><b>Runs today, with zero setup.</b><p>The prototype runs end-to-end in a safe demo mode without any API key — so we can show it live, right now, and connect your models when you're ready.</p></div></li>
+        <li><span class="dot"></span><div><b>Standards over silos.</b><p>An open agent protocol and a typed, component-based frontend mean the system is inspectable, extensible, and yours to grow.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="col">
+      <p class="eyebrow">The stack — and why each piece is here</p>
+      <h2>What it's made of</h2>
+      <p>Production-grade, widely-supported technology — each chosen for a specific reason, nothing exotic to be stranded by.</p>
+    </div>
+    <div class="stack">
+      <div class="tech">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="2.4"/><circle cx="19" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M7.3 11 16.7 6.7M7.3 13l9.4 4.3"/></svg></div>
+        <div><div class="nm">AG-UI Protocol</div><p class="why">Open, event-streamed standard that lets the agent drive real UI — not just return text.</p></div>
+      </div>
+      <div class="tech b1">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="12" cy="12" rx="10" ry="4.4"/><ellipse cx="12" cy="12" rx="10" ry="4.4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.4" transform="rotate(120 12 12)"/></g></svg></div>
+        <div><div class="nm">React + TypeScript</div><p class="why">Typed, component-based UI — so every rendered view is contract-checked, not hand-wired.</p></div>
+      </div>
+      <div class="tech b2">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><circle cx="7" cy="7" r="0.7" fill="currentColor"/><circle cx="7" cy="17" r="0.7" fill="currentColor"/></svg></div>
+        <div><div class="nm">Node · Express</div><p class="why">A lean server that holds your keys and orchestrates each agent run securely.</p></div>
+      </div>
+      <div class="tech b3">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2c.4 5.3 4.5 9.4 9.8 9.8C16.5 12.2 12.4 16.3 12 21.6 11.6 16.3 7.5 12.2 2.2 11.8 7.5 11.4 11.6 7.3 12 2Z"/></svg></div>
+        <div><div class="nm">Claude <small>default</small></div><p class="why">Anthropic's Claude — careful, well-reasoned analysis for diligence — set as the default brain out of the box.</p></div>
+      </div>
+      <div class="tech">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h12l-3-3M20 16H8l3 3"/></svg></div>
+        <div><div class="nm">Gemini · OpenAI <small>ready</small></div><p class="why">Swap the model provider in one line — never locked to a single vendor.</p></div>
+      </div>
+      <div class="tech b1">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="4" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="14" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M18 8l4 4-4 4"/></svg></div>
+        <div><div class="nm">Streaming <small>SSE</small></div><p class="why">Answers and views arrive token-by-token, in real time — no spinner, no wait.</p></div>
+      </div>
+      <div class="tech b2">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></div>
+        <div><div class="nm">Server-side data layer</div><p class="why">Every number is sourced from your governed data — the model never fabricates figures.</p></div>
+      </div>
+      <div class="tech b3">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+        <div><div class="nm">Voice in / stream out</div><p class="why">Talk to it naturally — it transcribes, reasons, and renders the answer live.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="border-bottom:0">
+    <div class="wrap" style="padding:0">
+      <div class="close">
+        <p class="eyebrow" style="color:var(--band-1)">In the room</p>
+        <h2>What we'll show you in ten minutes</h2>
+        <p>One live session, four moments — proof that the experience, the trust model, and the flexibility are all real today.</p>
+        <ul class="list">
+          <li>A spoken question, transcribed and answered</li>
+          <li>The same view, a different AI model</li>
+          <li>Numbers traced to source</li>
+          <li>Two people evaluating together</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">LightHouse · Candidate Intelligence Agent — confidential demo brief</footer>
+
+<script>
+  (function () {
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    /* Replace <Arrow> placeholders with a real SVG connector. */
+    var arrowSVG = '<svg class="arrow" width="26" height="20" viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 10h20M17 5l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    document.querySelectorAll("arrow, Arrow").forEach(function (a) {
+      var span = document.createElement("span");
+      span.innerHTML = arrowSVG;
+      a.replaceWith(span.firstChild);
+    });
+
+    /* ── Live audio waveform on canvas ────────────────────── */
+    var canvas = document.getElementById("wave");
+    if (canvas && canvas.getContext) {
+      var ctx = canvas.getContext("2d");
+      var dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      var W = 0, H = 0;
+      function resize() {
+        W = canvas.width = Math.round((canvas.clientWidth || 880) * dpr);
+        H = canvas.height = Math.round((canvas.clientHeight || 84) * dpr);
+      }
+      resize();
+      window.addEventListener("resize", resize);
+      function grad() {
+        var g = ctx.createLinearGradient(0, 0, W, 0);
+        g.addColorStop(0, "rgba(152,202,234,0)"); g.addColorStop(0.15, "#98caea");
+        g.addColorStop(0.5, "#6aaae4"); g.addColorStop(0.82, "#6354f2"); g.addColorStop(1, "rgba(99,84,242,0)");
+        return g;
+      }
+      function waveLine(t, baseAmp, freq, speed, phase, alpha, lw) {
+        ctx.beginPath();
+        var mid = H / 2;
+        for (var x = 0; x <= W; x += 2 * dpr) {
+          var nx = x / W;
+          var env = Math.sin(nx * Math.PI);
+          var mod = 0.55 + 0.45 * Math.sin(t * 0.0019 + nx * 7 + phase);
+          var y = mid + Math.sin(nx * freq + t * speed + phase) * (baseAmp * dpr * env * mod);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.globalAlpha = alpha; ctx.lineWidth = lw * dpr; ctx.strokeStyle = grad(); ctx.lineJoin = "round"; ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      function frame(t) {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(0, H / 2 - dpr * 0.5, W, dpr);
+        waveLine(t, 24, 18, 0.0042, 0, 0.95, 2.4);
+        waveLine(t, 17, 26, 0.003, 1.7, 0.55, 1.8);
+        waveLine(t, 11, 38, 0.0061, 3.4, 0.35, 1.4);
+        if (!reduce) requestAnimationFrame(frame);
+      }
+      reduce ? frame(1200) : requestAnimationFrame(frame);
+    }
+
+    /* ── Two-way conversation: you speak, it answers ──────── */
+    var you = document.getElementById("tx"), ans = document.getElementById("ans");
+    var aiLine = document.getElementById("aiLine"), cY = document.getElementById("caretY"), cA = document.getElementById("caretA");
+    var PAIRS = [
+      { q: "Can you show me the current shortlisted candidate pool?", a: "Here's today's pool — scored, shortlisted and interview stages, plotted by growth against drawdown." },
+      { q: "Which of these survived perturbation and achieved the highest alpha production, the lowest beta and minimal drawdown?", a: "Scored on all four criteria — one name leads on alpha and stress resilience, with near-zero beta." },
+      { q: "List the best 2 funds from that group and show me the irreducibility of these funds.", a: "The top two, and where their risk is irreducible — the systematic exposure that can't be diversified away." },
+      { q: "Combine irreducibility and perturbability to achieve the highest margin of safety. Explain why.", a: "Lowest irreducible risk plus the steadiest behaviour under stress gives the widest margin of safety — here's why." },
+      { q: "Based on these, what is the TTL (time to liquidate)?", a: "Weighted days to liquidate from the liquidity ladder — how fast the book unwinds at these terms." },
+    ];
+    if (you && ans) {
+      if (reduce) {
+        you.textContent = PAIRS[0].q; ans.textContent = PAIRS[0].a; aiLine.style.opacity = 1; cY.style.display = "none";
+      } else {
+        var idx = 0;
+        function typeYou() {
+          aiLine.style.opacity = 0; ans.textContent = ""; you.textContent = ""; cY.style.display = "inline-block"; cA.style.display = "none";
+          var q = PAIRS[idx].q, i = 0;
+          (function step() {
+            you.textContent = q.slice(0, ++i);
+            if (i < q.length) setTimeout(step, 40);
+            else { cY.style.display = "none"; setTimeout(streamAns, 480); }
+          })();
+        }
+        function streamAns() {
+          aiLine.style.opacity = 1; cA.style.display = "inline-block";
+          var w = PAIRS[idx].a.split(" "), n = 0;
+          (function step() {
+            ans.textContent = w.slice(0, ++n).join(" ");
+            if (n < w.length) setTimeout(step, 95);
+            else { cA.style.display = "none"; setTimeout(function () { idx = (idx + 1) % PAIRS.length; typeYou(); }, 2600); }
+          })();
+        }
+        setTimeout(typeYou, 700);
+      }
+    }
+  })();
+</script>
