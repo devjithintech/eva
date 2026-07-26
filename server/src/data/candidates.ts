@@ -385,7 +385,7 @@ const STRATEGY_LABELS: Record<string, string> = {
   quantitative: "Quantitative",
   volatility_arbitrage: "Volatility arbitrage",
 };
-function strategyLabel(c: Record<string, unknown>): string {
+export function strategyLabel(c: Record<string, unknown>): string {
   const fam = sec(c, "classification").strategy_family;
   if (typeof fam === "string" && fam) return STRATEGY_LABELS[fam] ?? titleize(fam);
   const t = sec(c, "strategy").type;
@@ -393,7 +393,7 @@ function strategyLabel(c: Record<string, unknown>): string {
 }
 
 /** Geographic focus → short label ("Global" when the fund spans everything). */
-function regionLabel(c: Record<string, unknown>): string {
+export function regionLabel(c: Record<string, unknown>): string {
   const g = sec(c, "classification").geographic_focus;
   const arr = Array.isArray(g)
     ? (g.filter((x) => typeof x === "string") as string[])
@@ -401,6 +401,19 @@ function regionLabel(c: Record<string, unknown>): string {
   if (!arr.length) return dash;
   if (arr.some((x) => x.toLowerCase() === "global")) return "Global";
   return arr.slice(0, 2).join(", ");
+}
+
+/** Raw geographic-focus tags (unjoined) — for facet filtering, unlike the
+ *  display-oriented `regionLabel()`. */
+export function regionTags(c: Record<string, unknown>): string[] {
+  const g = sec(c, "classification").geographic_focus;
+  return Array.isArray(g) ? (g.filter((x) => typeof x === "string") as string[]) : typeof g === "string" && g ? [g] : [];
+}
+
+/** Base currency code (e.g. "USD"), or null when unreported. */
+export function currencyLabel(c: Record<string, unknown>): string | null {
+  const cur = sec(c, "classification").base_currency;
+  return typeof cur === "string" && cur ? cur : null;
 }
 
 function trackRecordLabel(c: Record<string, unknown>): string {

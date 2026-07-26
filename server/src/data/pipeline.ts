@@ -3,10 +3,11 @@
  * candidates have been shortlisted / selected for interview. In-memory for now
  * (resets on restart); swap for a DB later. Keyed by candidate slug id.
  */
-export type Stage = "scored" | "shortlisted" | "interview";
+export type Stage = "scored" | "shortlisted" | "interview" | "rejected";
 
-/** Ordinal rank so interview ⊇ shortlisted ⊇ scored. */
-export const STAGE_RANK: Record<Stage, number> = { scored: 0, shortlisted: 1, interview: 2 };
+/** Ordinal rank so interview ⊇ shortlisted ⊇ scored. Rejected sits outside the
+ *  funnel (not counted as shortlisted/interview progress). */
+export const STAGE_RANK: Record<Stage, number> = { scored: 0, shortlisted: 1, interview: 2, rejected: -1 };
 
 const stages = new Map<string, Stage>();
 

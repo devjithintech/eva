@@ -2,7 +2,18 @@ import { Router, type Request, type Response } from "express";
 import { DataNotFound, readJson } from "./store.js";
 import { RENDERERS, RENDERER_BY_LABEL } from "./renderers.js";
 import { openapi } from "./openapi.js";
-import { buildCandidatePool, buildOpportunityMap, buildRendererData } from "../data/candidates.js";
+import {
+  buildAnalystFlags,
+  buildCandidatePool,
+  buildComparison,
+  buildOpportunityMap,
+  buildRendererData,
+  buildReturns,
+  buildScorecard,
+  currencyLabel,
+  regionTags,
+  strategyLabel,
+} from "../data/candidates.js";
 import { allStages, funnelCounts, getStage, setStage, type Stage } from "../data/pipeline.js";
 import {
   archiveConversation,
@@ -34,6 +45,9 @@ function summarize(name: string, rec: CandidateRecord): CandidateSummary {
     pmId: rec.pm_id ?? null,
     fundName: rec.subject_fund?.fund_name ?? null,
     flagCount: Array.isArray(rec.analyst_flags) ? rec.analyst_flags.length : 0,
+    currency: currencyLabel(rec),
+    strategy: strategyLabel(rec),
+    regions: regionTags(rec),
   };
 }
 
@@ -163,6 +177,14 @@ bff.get("/candidates/matrix", send((req) => {
  *  pipeline) + pool composition. Same builder the agent's tool uses. */
 bff.get("/opportunity-map", send(() => buildOpportunityMap()));
 
+/** Side-by-side comparison of two or more candidates (`?ids=a,b,c`). Same
+ *  builder the agent's render_comparison tool uses. Declared before
+ *  /candidates/:id so "compare" isn't captured as an id. */
+bff.get("/candidates/compare", send((req) => {
+  const ids = String(req.query.ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return buildComparison(ids);
+}));
+
 /** Get a candidate profile — `id` accepts slug / exact name / pm_id. */
 bff.get("/candidates/:id", send(async (req) => {
   const ds = await dataset();
@@ -172,9 +194,22 @@ bff.get("/candidates/:id", send(async (req) => {
   return { id: slug(name), name, ...rec };
 }));
 
+/** Committee scorecard (1–5 per criterion, derived from data.json). Same
+ *  builder the agent's render_scorecard tool uses. */
+bff.get("/candidates/:id/scorecard", send((req) => buildScorecard(req.params.id)));
+
+/** Analyst flags with severity, for one candidate. */
+bff.get("/candidates/:id/flags", send((req) => buildAnalystFlags(req.params.id)));
+
+/** Trailing-returns view (annual bar + growth-of-100 curve). `?years=` (default 5). */
+bff.get("/candidates/:id/returns", send((req) => {
+  const years = Number(req.query.years);
+  return buildReturns(req.params.id, Number.isFinite(years) ? years : undefined);
+}));
+
 /* ── Pipeline (shortlist / interview stage) ─────────────────────────────────── */
 
-const STAGES: Stage[] = ["scored", "shortlisted", "interview"];
+const STAGES: Stage[] = ["scored", "shortlisted", "interview", "rejected"];
 
 /** Funnel counts + each candidate's current stage. */
 bff.get("/pipeline", send(async () => {

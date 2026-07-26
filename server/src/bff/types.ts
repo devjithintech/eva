@@ -29,6 +29,12 @@ export interface CandidateSummary {
   pmId: string | null;
   fundName: string | null;
   flagCount: number;
+  /** Base currency code (e.g. "USD"), or null when unreported. Filter facet. */
+  currency: string | null;
+  /** Display-cased strategy family (e.g. "Long/short equity"). Filter facet. */
+  strategy: string;
+  /** Raw geographic-focus tags (e.g. ["North America", "Europe"]). Filter facet. */
+  regions: string[];
 }
 
 /** Pool overview: total count + candidate summaries. */

@@ -33,13 +33,16 @@ const rendererParams = [
 /* ── schemas ────────────────────────────────────────────────────────────────*/
 const CandidateSummary = {
   type: "object",
-  required: ["id", "name", "pmId", "fundName", "flagCount"],
+  required: ["id", "name", "pmId", "fundName", "flagCount", "currency", "strategy", "regions"],
   properties: {
     id: { type: "string", example: "anda" },
     name: { type: "string", example: "Anda" },
     pmId: { type: "string", nullable: true, example: "anda-asset-mgmt-fd1a9b11" },
     fundName: { type: "string", nullable: true, example: "ANDA Long-Short Dream" },
     flagCount: { type: "integer", example: 16 },
+    currency: { type: "string", nullable: true, example: "USD" },
+    strategy: { type: "string", example: "Long/short equity" },
+    regions: { type: "array", items: { type: "string" }, example: ["North America"] },
   },
 };
 const CandidateRecord = {

@@ -2,20 +2,15 @@
   "name": "lighthouse-candidate-intelligence",
   "private": true,
   "version": "0.1.0",
-  "description": "LightHouse Candidate Intelligence Agent — an AG-UI generative-UI app (Vite/React frontend + Express agent backend).",
-  "workspaces": [
-    "server",
-    "web"
-  ],
+  "description": "LightHouse Candidate Intelligence Agent — an AG-UI generative-UI app (conversation-ui + dashboard-ui Vite/React frontends + Express agent backend). server/, conversation-ui/, and dashboard-ui/ are independent npm packages — each has its own package-lock.json and node_modules, installed separately. This root package.json has no dependencies of its own (no root node_modules) — it only orchestrates dev/build/typecheck via shell.",
   "scripts": {
-    "dev": "npm-run-all --parallel dev:server dev:web",
-    "dev:server": "npm run dev --workspace server",
-    "dev:web": "npm run dev --workspace web",
-    "build": "npm run build --workspace server && npm run build --workspace web",
-    "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace web"
-  },
-  "devDependencies": {
-    "npm-run-all": "^4.1.5"
+    "dev": "trap 'kill 0' EXIT; npm --prefix server run dev & npm --prefix conversation-ui run dev & npm --prefix dashboard-ui run dev & wait",
+    "dev:server": "npm --prefix server run dev",
+    "dev:conversation-ui": "npm --prefix conversation-ui run dev",
+    "dev:dashboard-ui": "npm --prefix dashboard-ui run dev",
+    "install:all": "npm --prefix server install && npm --prefix conversation-ui install && npm --prefix dashboard-ui install",
+    "build": "npm --prefix server run build && npm --prefix conversation-ui run build && npm --prefix dashboard-ui run build",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix conversation-ui run typecheck && npm --prefix dashboard-ui run typecheck"
   },
   "engines": {
     "node": ">=18.17"
