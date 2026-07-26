@@ -28,8 +28,9 @@ export function VehicleExperienceSection({ rec }: Props) {
           <div className="v">{str(vehexp.has_hedge_fund_experience)}</div>
           <div className="k">Own Fund Vs PM</div>
           <div className="v">{str(vehexp.own_fund_vs_pm)}</div>
+          <div className="k">AUM Drift Note</div>
+          <div className="v">{str(vehexp.aum_drift_note)}</div>
         </div>
-        {str(vehexp.aum_drift_note) !== "—" && <p className="prose" style={{ marginTop: 14 }}>{str(vehexp.aum_drift_note)}</p>}
       </div>
     </section>
   );

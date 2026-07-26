@@ -1,25 +1,16 @@
-import { useScorecard } from "../../api/hooks";
 import { firstScoped, firstSection, str } from "../../api/sections";
 import type { CandidateRecord } from "../../api/types";
-import { LoadingState } from "../common/LoadingState";
-import { ErrorState } from "../common/ErrorState";
 
 interface Props {
-  id: string;
   rec: CandidateRecord;
 }
 
-function toneOf(overall: number): string {
-  return overall >= 4.2 ? "green" : overall >= 3.5 ? "violet" : "amber";
-}
-
-/** Executive summary — the Committee scorecard widget (real, via
- *  GET /api/candidates/:id/scorecard) followed by narrative rows assembled
- *  from real record fields (strategy/manager/market_views/classification),
- *  each falling back to a short generic sentence when its source field is
- *  unreported rather than leaving a blank row. */
-export function ExecutiveSummarySection({ id, rec }: Props) {
-  const { data, loading, error } = useScorecard(id);
+/** Executive summary — narrative rows assembled from real record fields
+ *  (strategy/manager/market_views/classification), each falling back to a
+ *  short generic sentence when its source field is unreported rather than
+ *  leaving a blank row. Matches the design reference: a plain exec-row list,
+ *  no scoring widget. */
+export function ExecutiveSummarySection({ rec }: Props) {
   const strategy = firstSection(rec, "strategy");
   const manager = firstSection(rec, "manager");
   const marketViews = firstSection(rec, "market_views");
@@ -82,31 +73,6 @@ export function ExecutiveSummarySection({ id, rec }: Props) {
         <h2>Executive summary</h2>
       </div>
       <div className="sec-body">
-        {loading && <LoadingState label="Scoring…" />}
-        {!loading && (error || !data) && <ErrorState message={error ?? "No scorecard available"} />}
-        {!loading && data && (
-          <div className="sc-overall">
-            <div className={`sc-overall-num ${toneOf(data.overall)}`}>{data.overall.toFixed(1)}</div>
-            <div className="sc-overall-copy">
-              <div className="rec">{data.recommendation}</div>
-              <div className="rec-detail">{data.recommendationDetail}</div>
-            </div>
-          </div>
-        )}
-        {!loading && data && (
-          <div className="sc-criteria">
-            {data.criteria.map((c) => (
-              <div className="sc-row" key={c.label}>
-                <span className="sc-label">{c.label}</span>
-                <span className="sc-track">
-                  <span className={`sc-fill ${c.tone}`} style={{ width: `${(c.score / 5) * 100}%` }} />
-                </span>
-                <span className="sc-val">{c.score.toFixed(1)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
         {rows.map((r) => (
           <div className="exec-row" key={r.label}>
             <div className="exec-label">{r.label}</div>

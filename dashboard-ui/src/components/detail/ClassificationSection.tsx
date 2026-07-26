@@ -31,16 +31,22 @@ export function ClassificationSection({ rec }: Props) {
           <div className="v">{str(classification.asset_class)}</div>
           <div className="k">Geographic Focus</div>
           <div className="v">{list(classification.geographic_focus)}</div>
+          <div className="k">Manager Location</div>
+          <div className="v">{str(classification.manager_location)}</div>
           <div className="k">Domicile</div>
           <div className="v">{str(classification.domicile)}</div>
-          <div className="k">Vehicle Type</div>
-          <div className="v">{str(classification.vehicle_type)}</div>
-          <div className="k">Inception Date</div>
-          <div className="v">{str(classification.inception_date)}</div>
-          <div className="k">Track Record Audited</div>
-          <div className="v">{str(classification.is_track_record_audited)}</div>
+          <div className="k">Base Currency</div>
+          <div className="v">{str(classification.base_currency)}</div>
           <div className="k">Stated Benchmark</div>
           <div className="v">{str(classification.stated_benchmark)}</div>
+          <div className="k">Inception Date</div>
+          <div className="v">{str(classification.inception_date)}</div>
+          <div className="k">Track Record Start Date</div>
+          <div className="v">{str(classification.track_record_start_date)}</div>
+          <div className="k">Is Track Record Audited</div>
+          <div className="v">{str(classification.is_track_record_audited)}</div>
+          <div className="k">Vehicle Type</div>
+          <div className="v">{str(classification.vehicle_type)}</div>
         </div>
       </div>
     </section>

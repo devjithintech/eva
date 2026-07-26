@@ -45,14 +45,14 @@ const SECTIONS: NavSection[] = [
   { id: "holdings", label: "Holdings" },
   { id: "liquidity", label: "Liquidity" },
   { id: "manager", label: "Manager & team" },
+];
+
+const MORE_SECTIONS: NavSection[] = [
   { id: "vehexp", label: "Vehicle experience" },
   { id: "fees", label: "Fees" },
   { id: "terms", label: "Terms & redemption" },
   { id: "ops", label: "Operations & compliance" },
   { id: "riskfw", label: "Risk framework" },
-];
-
-const MORE_SECTIONS: NavSection[] = [
   { id: "classification", label: "Classification" },
   { id: "views", label: "Market views" },
   { id: "aum", label: "AUM" },
@@ -70,12 +70,12 @@ export function CandidateDetailPage({ id }: Props) {
       <div className="layout">
         <SidebarNav sections={SECTIONS} moreSections={MORE_SECTIONS} />
         <main className="content">
-          <ExecutiveSummarySection id={id} rec={rec} />
+          <ExecutiveSummarySection rec={rec} />
           <PortfolioAnalysisSection />
           <RiskResearchSection />
           <AnalystFlagsSection id={id} />
           <OverviewSection rec={rec} />
-          <PerformanceSection id={id} />
+          <PerformanceSection rec={rec} />
           <ReturnsByFundSection id={id} rec={rec} />
           <RiskSection rec={rec} />
           <BenchmarkActivenessSection rec={rec} />

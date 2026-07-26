@@ -31,15 +31,15 @@ export function ManagerSection({ rec }: Props) {
           <div className="v">{str(manager.current_firm)}</div>
           <div className="k">Current Role</div>
           <div className="v">{str(manager.current_role)}</div>
-          <div className="k">Experience</div>
-          <div className="v">{str(manager.experience_years)} years</div>
+          <div className="k">Experience Years</div>
+          <div className="v">{str(manager.experience_years)}</div>
           <div className="k">Team Size</div>
           <div className="v">{str(manager.team_size)}</div>
-          <div className="k">Solo PM</div>
+          <div className="k">Is Solo PM</div>
           <div className="v">{str(manager.is_solo_pm)}</div>
+          <div className="k">Key Person Risk Note</div>
+          <div className="v">{str(manager.key_person_risk_note)}</div>
         </div>
-
-        {str(manager.key_person_risk_note) !== "—" && <p className="note" style={{ marginTop: 12 }}>{str(manager.key_person_risk_note)}</p>}
 
         {(education.length > 0 || priorFirms.length > 0) && (
           <>
@@ -65,8 +65,8 @@ export function ManagerSection({ rec }: Props) {
                 <tr>
                   <th>Firm</th>
                   <th>Role</th>
-                  <th className="r">Start</th>
-                  <th className="r">End</th>
+                  <th className="r">Start Year</th>
+                  <th className="r">End Year</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,6 +91,7 @@ export function ManagerSection({ rec }: Props) {
                 <tr>
                   <th>Name</th>
                   <th>Title</th>
+                  <th>Role</th>
                   <th className="r">Experience</th>
                 </tr>
               </thead>
@@ -99,6 +100,7 @@ export function ManagerSection({ rec }: Props) {
                   <tr key={i}>
                     <td>{str(m.name)}</td>
                     <td>{str(m.title)}</td>
+                    <td>{str(m.role)}</td>
                     <td className="num">{str(m.experience_years)}</td>
                   </tr>
                 ))}

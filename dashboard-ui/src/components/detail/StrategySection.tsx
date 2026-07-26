@@ -6,7 +6,9 @@ interface Props {
 }
 
 /** Strategy — real data from the `strategy` raw section (present, at least
- *  partially, on every candidate). */
+ *  partially, on every candidate). Reference renders every field as one flat
+ *  grid, including the long-form narrative fields — matched here rather than
+ *  splitting them into separate prose/h3 blocks. */
 export function StrategySection({ rec }: Props) {
   const strategy = firstSection(rec, "strategy");
 
@@ -28,26 +30,23 @@ export function StrategySection({ rec }: Props) {
           <div className="v">{str(strategy.type)}</div>
           <div className="k">Sub Strategy</div>
           <div className="v">{str(strategy.sub_strategy)}</div>
+          <div className="k">Description</div>
+          <div className="v">{str(strategy.description)}</div>
+          <div className="k">Investment Thesis Core</div>
+          <div className="v">{str(strategy.investment_thesis_core)}</div>
+          <div className="k">Idea Generation</div>
+          <div className="v">{str(strategy.idea_generation)}</div>
           <div className="k">Instruments</div>
           <div className="v">{list(strategy.instruments)}</div>
           <div className="k">Market Cap Focus</div>
           <div className="v">{str(strategy.market_cap_focus)}</div>
-          <div className="k">Decision Process</div>
-          <div className="v">{str(strategy.decision_making_process)}</div>
+          <div className="k">Neutrality Approach</div>
+          <div className="v">{str(strategy.neutrality_approach)}</div>
+          <div className="k">Decision Style</div>
+          <div className="v">{str(strategy.decision_style)}</div>
+          <div className="k">Family Defining Note</div>
+          <div className="v">{str(strategy.family_defining_note)}</div>
         </div>
-        {str(strategy.description) !== "—" && <p className="prose">{str(strategy.description)}</p>}
-        {str(strategy.investment_thesis_core) !== "—" && (
-          <>
-            <h3>Investment thesis</h3>
-            <p className="prose">{str(strategy.investment_thesis_core)}</p>
-          </>
-        )}
-        {str(strategy.idea_generation) !== "—" && (
-          <>
-            <h3>Idea generation</h3>
-            <p className="prose">{str(strategy.idea_generation)}</p>
-          </>
-        )}
       </div>
     </section>
   );

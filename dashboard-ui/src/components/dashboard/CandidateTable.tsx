@@ -1,6 +1,10 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { MatrixRow, Stage } from "../../api/types";
-import { CandidateRowDetail } from "./CandidateRowDetail";
+import { RowActionsMenu } from "./RowActionsMenu";
+import { SelectInterviewDialog } from "./SelectInterviewDialog";
+import { ShareProfileDialog } from "./ShareProfileDialog";
+import { AddNoteDialog } from "./AddNoteDialog";
+import { RejectCandidateDialog } from "./RejectCandidateDialog";
 
 export interface TableRow extends MatrixRow {
   id: string;
@@ -30,10 +34,12 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 const fmtPct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`);
 const fmtNum = (v: number | null) => (v == null ? "—" : v.toFixed(2));
 
+type ActionType = "select" | "share" | "note" | "reject";
+
 export function CandidateTable({ rows, scores, compareMode, selected, onToggleSelect, onAdvance, onReject }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("alpha");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [action, setAction] = useState<{ type: ActionType; id: string; name: string } | null>(null);
 
   const sorted = useMemo(() => {
     const copy = [...rows];
@@ -59,7 +65,6 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
         <thead>
           <tr>
             {compareMode && <th style={{ width: 34 }}></th>}
-            <th className="cl-exp"></th>
             <th className="r" style={{ width: 30 }}>#</th>
             <th>Candidate</th>
             <th style={{ width: 60 }}>Score</th>
@@ -73,79 +78,67 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
           </tr>
         </thead>
         <tbody>
-          {sorted.map((r, i) => {
-            const open = expandedId === r.id;
-            return (
-              <Fragment key={r.id}>
-                <tr
-                  className="cl-row"
-                  onClick={() => {
-                    window.location.hash = `#/candidates/${r.id}`;
-                  }}
-                >
-                  {compareMode && (
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(r.id)}
-                        onChange={() => onToggleSelect(r.id)}
-                      />
-                    </td>
-                  )}
-                  <td
-                    className="cl-exp"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setExpandedId(open ? null : r.id);
-                    }}
-                  >
-                    <button type="button" className={`cl-expbtn${open ? " open" : ""}`} aria-label="Show profile">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </button>
-                  </td>
-                  <td className="cl-rank">{i + 1}</td>
-                  <td className="cl-cand">
-                    <div className="nm">{r.name}</div>
-                    {r.flagCount > 0 && <div className="fn">⚑ {r.flagCount} analyst flag{r.flagCount === 1 ? "" : "s"}</div>}
-                  </td>
-                  <td className="r">
-                    <span className="cl-ais">{scores.get(r.name) ?? "—"}</span>
-                  </td>
-                  <td className={`r ${r.alpha != null ? (r.alpha >= 0 ? "pos" : "neg") : ""}`}>{fmtPct(r.alpha)}</td>
-                  <td className={`r ${r.cagr != null ? (r.cagr >= 0 ? "pos" : "neg") : ""}`}>{fmtPct(r.cagr)}</td>
-                  <td className="r">{fmtNum(r.sharpe)}</td>
-                  <td className="r neg">{fmtPct(r.dd)}</td>
-                  <td className="cl-more" onClick={(e) => e.stopPropagation()}>
-                    {r.stage !== "interview" && (
-                      <button
-                        type="button"
-                        className="btn"
-                        style={{ marginRight: 6 }}
-                        onClick={() => onAdvance(r.id)}
-                        title="Select for interview"
-                      >
-                        → Interview
-                      </button>
-                    )}
-                    <button type="button" className="btn danger" onClick={() => onReject(r.id)} title="Reject candidate">
-                      Reject
-                    </button>
-                  </td>
-                </tr>
-                {open && (
-                  <tr>
-                    <td colSpan={compareMode ? 9 : 8} style={{ padding: 0, border: "none" }}>
-                      <CandidateRowDetail id={r.id} />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
+          {sorted.map((r, i) => (
+            <tr
+              key={r.id}
+              className="cl-row"
+              onClick={() => {
+                window.location.hash = `#/candidates/${r.id}`;
+              }}
+            >
+              {compareMode && (
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(r.id)}
+                    onChange={() => onToggleSelect(r.id)}
+                  />
+                </td>
+              )}
+              <td className="cl-rank">{i + 1}</td>
+              <td className="cl-cand">
+                <div className="nm">{r.name}</div>
+                {r.flagCount > 0 && <div className="fn">⚑ {r.flagCount} analyst flag{r.flagCount === 1 ? "" : "s"}</div>}
+              </td>
+              <td className="r">
+                <span className="cl-ais">{scores.get(r.name) ?? "—"}</span>
+              </td>
+              <td className={`r ${r.alpha != null ? (r.alpha >= 0 ? "pos" : "neg") : ""}`}>{fmtPct(r.alpha)}</td>
+              <td className={`r ${r.cagr != null ? (r.cagr >= 0 ? "pos" : "neg") : ""}`}>{fmtPct(r.cagr)}</td>
+              <td className="r">{fmtNum(r.sharpe)}</td>
+              <td className="r neg">{fmtPct(r.dd)}</td>
+              <td className="cl-more" onClick={(e) => e.stopPropagation()}>
+                <RowActionsMenu
+                  showInterview={r.stage !== "interview"}
+                  onSelectInterview={() => setAction({ type: "select", id: r.id, name: r.name })}
+                  onShare={() => setAction({ type: "share", id: r.id, name: r.name })}
+                  onAddNote={() => setAction({ type: "note", id: r.id, name: r.name })}
+                  onReject={() => setAction({ type: "reject", id: r.id, name: r.name })}
+                />
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
+
+      <SelectInterviewDialog
+        open={action?.type === "select"}
+        onClose={() => setAction(null)}
+        candidateName={action?.name ?? ""}
+        onConfirm={() => {
+          if (action) onAdvance(action.id);
+        }}
+      />
+      <ShareProfileDialog open={action?.type === "share"} onClose={() => setAction(null)} candidateName={action?.name ?? ""} />
+      <AddNoteDialog open={action?.type === "note"} onClose={() => setAction(null)} />
+      <RejectCandidateDialog
+        open={action?.type === "reject"}
+        onClose={() => setAction(null)}
+        candidateName={action?.name ?? ""}
+        onConfirm={() => {
+          if (action) onReject(action.id);
+        }}
+      />
     </div>
   );
 }

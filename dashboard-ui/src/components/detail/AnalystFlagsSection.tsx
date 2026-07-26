@@ -31,8 +31,7 @@ export function AnalystFlagsSection({ id }: Props) {
           <ul className="flaglist">
             {data.flags.map((f, i) => (
               <li key={i} className={f.severity}>
-                <b>{f.title}</b>
-                {f.detail !== f.title && <div style={{ marginTop: 2 }}>{f.detail}</div>}
+                {f.detail}
               </li>
             ))}
           </ul>

@@ -26,6 +26,18 @@ export function firstScoped(v: unknown): Record<string, unknown> {
   return (v ?? {}) as Record<string, unknown>;
 }
 
+/** Every scoped entry off a raw CandidateRecord section, in document order —
+ *  unlike `firstSection`, which picks the single best-scoped entry, this is
+ *  for sections like `return_skill` where each entry is its own distinct
+ *  as-reported snapshot worth showing individually. A plain non-empty object
+ *  becomes a single-entry list; a missing value becomes []. */
+export function allSection(rec: Record<string, unknown>, key: string): Record<string, unknown>[] {
+  const v = rec[key];
+  if (Array.isArray(v)) return v as Record<string, unknown>[];
+  if (v && typeof v === "object") return [v as Record<string, unknown>];
+  return [];
+}
+
 /** Format a number as a signed percentage string, or "—" when absent. */
 export function signedPct(v: unknown): string {
   const n = typeof v === "number" ? v : null;

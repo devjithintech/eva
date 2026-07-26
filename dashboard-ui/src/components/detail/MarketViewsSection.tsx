@@ -20,11 +20,24 @@ function Bullets({ title, items }: { title: string; items: unknown }) {
   );
 }
 
+interface MarketCall {
+  date?: string;
+  call?: string;
+  source_doc?: string;
+}
+
 /** Market views — real data from `market_views`, the richest section in the
  *  dataset (84% average field fill). */
 export function MarketViewsSection({ rec }: Props) {
   const mv = firstSection(rec, "market_views");
-  const hasAny = str(mv.macro_thesis) !== "—" || str(mv.forward_outlook) !== "—" || Array.isArray(mv.sector_views) || Array.isArray(mv.geographic_views) || Array.isArray(mv.key_risks_identified);
+  const calls = (Array.isArray(mv.specific_market_calls) ? mv.specific_market_calls : []) as MarketCall[];
+  const hasAny =
+    str(mv.macro_thesis) !== "—" ||
+    str(mv.forward_outlook) !== "—" ||
+    Array.isArray(mv.sector_views) ||
+    Array.isArray(mv.geographic_views) ||
+    Array.isArray(mv.key_risks_identified) ||
+    calls.length > 0;
 
   return (
     <section id="views" className="sec">
@@ -47,6 +60,29 @@ export function MarketViewsSection({ rec }: Props) {
           <>
             <h3>Forward outlook</h3>
             <p className="prose">{str(mv.forward_outlook)}</p>
+          </>
+        )}
+        {calls.length > 0 && (
+          <>
+            <h3>Specific calls</h3>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Call</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calls.map((c, i) => (
+                  <tr key={i}>
+                    <td>{str(c.date)}</td>
+                    <td>{str(c.call)}</td>
+                    <td className="basis">{str(c.source_doc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </>
         )}
       </div>

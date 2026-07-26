@@ -32,21 +32,13 @@ export function OperationsComplianceSection({ rec }: Props) {
           <div className="v">{str(ops.custodian)}</div>
           <div className="k">Regulatory Registrations</div>
           <div className="v">{list(ops.regulatory_registrations)}</div>
+          <div className="k">Compliance Framework</div>
+          <div className="v">{str(ops.compliance_framework)}</div>
           <div className="k">ESG Score</div>
           <div className="v">{str(ops.esg_score)}</div>
+          <div className="k">Benchmark Appropriateness Note</div>
+          <div className="v">{str(ops.benchmark_appropriateness_note)}</div>
         </div>
-        {str(ops.compliance_framework) !== "—" && (
-          <>
-            <h3>Compliance framework</h3>
-            <p className="prose">{str(ops.compliance_framework)}</p>
-          </>
-        )}
-        {str(ops.benchmark_appropriateness_note) !== "—" && (
-          <>
-            <h3>Benchmark appropriateness</h3>
-            <p className="prose">{str(ops.benchmark_appropriateness_note)}</p>
-          </>
-        )}
       </div>
     </section>
   );

@@ -29,9 +29,9 @@ export function RiskFrameworkSection({ rec }: Props) {
           <p className="note">No risk framework documented for this candidate.</p>
         ) : (
           <div className="grid">
-            <div className="k">Risk Framework</div>
+            <div className="k">Risk Framework Description</div>
             <div className="v">{str(rf.risk_framework_description)}</div>
-            <div className="k">Drawdown Response</div>
+            <div className="k">Drawdown Response Protocol</div>
             <div className="v">{str(rf.drawdown_response_protocol)}</div>
             <div className="k">Position Limits</div>
             <div className="v">{str(rf.position_limits)}</div>

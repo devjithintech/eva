@@ -6,16 +6,17 @@
  *  the shape the analysis would take once a real factor-regression pipeline
  *  is wired up. */
 
-const FACTORS: { name: string; beta: number; tstat: number; sig: "y" | "m" | "n" }[] = [
-  { name: "Market (Mkt–RF)", beta: 0.41, tstat: 4.2, sig: "y" },
-  { name: "Size (SMB)", beta: 0.12, tstat: 1.1, sig: "m" },
-  { name: "Value (HML)", beta: 0.28, tstat: 3.1, sig: "y" },
-  { name: "Momentum (MOM)", beta: 0.19, tstat: 2.0, sig: "y" },
-  { name: "Profitability (RMW)", beta: 0.44, tstat: 4.8, sig: "y" },
-  { name: "Investment (CMA)", beta: 0.07, tstat: 0.8, sig: "n" },
-  { name: "Low Volatility (BAB)", beta: -0.14, tstat: -1.4, sig: "m" },
+const FACTORS: { name: string; b63: number; b252: number; tstat: number; sig: "y" | "m" | "n" }[] = [
+  { name: "Market (Mkt–RF)", b63: 0.41, b252: 0.38, tstat: 4.2, sig: "y" },
+  { name: "Size (SMB)", b63: 0.12, b252: 0.09, tstat: 1.1, sig: "m" },
+  { name: "Value (HML)", b63: 0.28, b252: 0.31, tstat: 3.1, sig: "y" },
+  { name: "Momentum (MOM)", b63: 0.19, b252: 0.22, tstat: 2.0, sig: "y" },
+  { name: "Profitability (RMW)", b63: 0.44, b252: 0.41, tstat: 4.8, sig: "y" },
+  { name: "Investment (CMA)", b63: 0.07, b252: 0.1, tstat: 0.8, sig: "n" },
+  { name: "Low Volatility (BAB)", b63: -0.14, b252: -0.11, tstat: -1.4, sig: "m" },
 ];
 const SIG_LABEL: Record<string, string> = { y: "Significant", m: "Marginal", n: "Not sig." };
+const barPx = (v: number) => `${Math.round(Math.abs(v) * 190)}px`;
 
 export function PortfolioAnalysisSection() {
   return (
@@ -32,13 +33,15 @@ export function PortfolioAnalysisSection() {
         <h2>Portfolio analysis</h2>
       </div>
       <div className="sec-body">
-        <p className="note">Illustrative — no factor-regression pipeline is wired up for individual candidates yet; this shows the intended format.</p>
         <h3>Factor regression — submitted portfolio</h3>
+        <p className="note">Illustrative · OLS · 7 factors · W=63d and W=252d — no factor-regression pipeline is wired up for individual candidates yet.</p>
         <table className="data">
           <thead>
             <tr>
               <th>Factor</th>
-              <th className="r">Beta</th>
+              <th>B 63d vs 252d</th>
+              <th className="r">B 63d</th>
+              <th className="r">B 252d</th>
               <th className="r">T-stat</th>
               <th>Significance</th>
             </tr>
@@ -47,52 +50,91 @@ export function PortfolioAnalysisSection() {
             {FACTORS.map((f) => (
               <tr key={f.name}>
                 <td>{f.name}</td>
-                <td className="num">{f.beta.toFixed(2)}</td>
+                <td>
+                  <span className="bpair">
+                    <i className="b63" style={{ width: barPx(f.b63) }} />
+                    <i className="b252" style={{ width: barPx(f.b252) }} />
+                  </span>
+                </td>
+                <td className="num">{f.b63.toFixed(2)}</td>
+                <td className="num">{f.b252.toFixed(2)}</td>
                 <td className="num">{f.tstat.toFixed(1)}</td>
-                <td>{SIG_LABEL[f.sig]}</td>
+                <td>
+                  <span className={`sig ${f.sig}`}>{SIG_LABEL[f.sig]}</span>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 16 }}>
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Performance</h3>
-            <div className="grid">
-              <div className="k">Ann. alpha</div>
-              <div className="v">+18.4%</div>
-              <div className="k">Information ratio</div>
-              <div className="v">1.42</div>
-              <div className="k">Tracking error</div>
-              <div className="v">13.0%</div>
-              <div className="k">Hit rate (monthly)</div>
-              <div className="v">63%</div>
+        <div className="pa-cards">
+          <div className="card pa-card">
+            <div className="card-head">Performance</div>
+            <div className="pa-row">
+              <span className="pa-k">Ann. alpha</span>
+              <span className="pa-v pos">+18.4%</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Information ratio</span>
+              <span className="pa-v pos">1.42</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Tracking error</span>
+              <span className="pa-v">13.0%</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Hit rate (monthly)</span>
+              <span className="pa-v pos">63%</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">R²</span>
+              <span className="pa-v">0.71</span>
             </div>
           </div>
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Risk metrics</h3>
-            <div className="grid">
-              <div className="k">Gross exposure</div>
-              <div className="v">124%</div>
-              <div className="k">Net exposure</div>
-              <div className="v">38%</div>
-              <div className="k">Largest position</div>
-              <div className="v">6.2% NAV</div>
-              <div className="k">Implied VaR (95%)</div>
-              <div className="v">-2.1%/day</div>
+          <div className="card pa-card">
+            <div className="card-head">Risk metrics</div>
+            <div className="pa-row">
+              <span className="pa-k">Gross exposure</span>
+              <span className="pa-v">124%</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Net exposure</span>
+              <span className="pa-v">38%</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Largest position</span>
+              <span className="pa-v">6.2% NAV</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Implied VaR (95%)</span>
+              <span className="pa-v negv">-2.1%/day</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Max drawdown</span>
+              <span className="pa-v negv">-14.3%</span>
             </div>
           </div>
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Fund fit</h3>
-            <div className="grid">
-              <div className="k">Gap fill score</div>
-              <div className="v">0.78 / 1.0</div>
-              <div className="k">Max PM correlation</div>
-              <div className="v">0.53</div>
-              <div className="k">Penalty triggered?</div>
-              <div className="v">No (&lt; 0.60)</div>
-              <div className="k">Fund fit rating</div>
-              <div className="v">Strong</div>
+          <div className="card pa-card">
+            <div className="card-head">Fund fit</div>
+            <div className="pa-row">
+              <span className="pa-k">Gap fill score</span>
+              <span className="pa-v pos">0.78 / 1.0</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Max PM correlation</span>
+              <span className="pa-v">0.53</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Penalty triggered?</span>
+              <span className="pa-v pos">No (&lt; 0.60)</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">ENS impact</span>
+              <span className="pa-v pos">+0.8</span>
+            </div>
+            <div className="pa-row">
+              <span className="pa-k">Fund fit rating</span>
+              <span className="pa-v pos">Strong</span>
             </div>
           </div>
         </div>

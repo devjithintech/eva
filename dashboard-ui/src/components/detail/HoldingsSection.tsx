@@ -91,6 +91,8 @@ export function HoldingsSection({ rec }: Props) {
           <div className="v">{list(holdings.holding_types)}</div>
           <div className="k">Uses Index Instruments</div>
           <div className="v">{str(holdings.uses_index_instruments)}</div>
+          <div className="k">Index Instruments Note</div>
+          <div className="v">{str(holdings.index_instruments_note)}</div>
         </div>
       </div>
     </section>

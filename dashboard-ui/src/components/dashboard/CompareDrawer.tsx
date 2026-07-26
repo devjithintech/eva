@@ -121,7 +121,7 @@ export function CompareDrawer({ ids, onBack }: Props) {
   };
 
   return (
-    <div className="cf-wrap">
+    <div className="container cf-wrap">
       <Breadcrumbs items={[{ label: "Home", href: CONVERSATION_URL }, { label: "Candidates & Funds", href: "#/" }, { label: "Compare" }]} />
 
       <div className="cmp-toolbar">

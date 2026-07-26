@@ -10,7 +10,9 @@ interface Props {
  *  a grid of all-dashes. */
 export function FeesSection({ rec }: Props) {
   const fees = firstSection(rec, "fees");
-  const empty = str(fees.management_fee_pct) === "—" && str(fees.incentive_fee_pct) === "—" && str(fees.has_high_water_mark) === "—";
+  const hwmNote = str(fees.hwm_status_note);
+  const empty =
+    str(fees.management_fee_pct) === "—" && str(fees.incentive_fee_pct) === "—" && str(fees.has_high_water_mark) === "—" && hwmNote === "—";
 
   return (
     <section id="fees" className="sec">
@@ -28,16 +30,24 @@ export function FeesSection({ rec }: Props) {
         {empty ? (
           <p className="note">Fee terms not disclosed for this candidate.</p>
         ) : (
-          <div className="grid">
-            <div className="k">Management Fee</div>
-            <div className="v">{pct(fees.management_fee_pct)}</div>
-            <div className="k">Incentive Fee</div>
-            <div className="v">{pct(fees.incentive_fee_pct)}</div>
-            <div className="k">High-Water Mark</div>
-            <div className="v">{str(fees.has_high_water_mark)}</div>
-            <div className="k">Hurdle Rate</div>
-            <div className="v">{str(fees.hurdle_rate)}</div>
-          </div>
+          <>
+            {hwmNote !== "—" && (
+              <div className="grid">
+                <div className="k">HWM Status Note</div>
+                <div className="v">{hwmNote}</div>
+              </div>
+            )}
+            <div className="grid" style={{ marginTop: hwmNote !== "—" ? 14 : 0 }}>
+              <div className="k">Management Fee</div>
+              <div className="v">{pct(fees.management_fee_pct)}</div>
+              <div className="k">Incentive Fee</div>
+              <div className="v">{pct(fees.incentive_fee_pct)}</div>
+              <div className="k">High-Water Mark</div>
+              <div className="v">{str(fees.has_high_water_mark)}</div>
+              <div className="k">Hurdle Rate</div>
+              <div className="v">{str(fees.hurdle_rate)}</div>
+            </div>
+          </>
         )}
       </div>
     </section>

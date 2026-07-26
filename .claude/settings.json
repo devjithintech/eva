@@ -53,7 +53,18 @@
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const a=JSON.parse\\(d\\);console.log\\(a.slice\\(0,5\\).map\\(c=>c.id\\).join\\(','\\)\\);}\\)\")",
       "Bash(node verify_detail5.js /private/tmp/claude-501/-Users-jithinkr-workspace-eva/48c39233-0078-42d9-b075-d93fff3abee9/scratchpad/shots)",
       "Bash(pkill -9 -f \"playwright\")",
-      "Bash(node verify_compare2.js /private/tmp/claude-501/-Users-jithinkr-workspace-eva/48c39233-0078-42d9-b075-d93fff3abee9/scratchpad/shots)"
+      "Bash(node verify_compare2.js /private/tmp/claude-501/-Users-jithinkr-workspace-eva/48c39233-0078-42d9-b075-d93fff3abee9/scratchpad/shots)",
+      "Bash(node verify_riskresearch.js /private/tmp/claude-501/-Users-jithinkr-workspace-eva/48c39233-0078-42d9-b075-d93fff3abee9/scratchpad/shots)",
+      "Bash(grep -n \"^\\\\.prose\\\\|\\\\.prose,\\\\|\\\\.prose {\" /Users/jithinkr/workspace/eva/dashboard-ui/src/styles/global.css)",
+      "Bash(awk -F: '$1>5010 && $1<6500')",
+      "Bash(node -e ' *)",
+      "Bash(sort -k2 -n -r)",
+      "Bash(curl -s http://localhost:8787/api/candidates/anda)",
+      "Bash(curl -s http://localhost:8787/api/candidates/winton)",
+      "Bash(mkdir -p /private/tmp/claude-501/-Users-jithinkr-workspace-eva/48c39233-0078-42d9-b075-d93fff3abee9/scratchpad/json2gg)",
+      "Bash(unzip -o -q \"/Users/jithinkr/Downloads/json 2 gg.zip\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('API candidate count:', len\\(d\\)\\)\")",
+      "Bash(curl -s \"http://localhost:8787/api/candidates\")"
     ]
   }
 }
