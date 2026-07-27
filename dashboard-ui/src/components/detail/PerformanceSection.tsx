@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { allSection, firstSection, pct, str } from "../../api/sections";
 import type { CandidateRecord } from "../../api/types";
 import { AnnualBarGraph } from "./AnnualBarGraph";
@@ -13,18 +13,30 @@ interface AnnualReturn {
   is_net?: boolean;
 }
 
-function splitPeriod(period: string): { start: string; end: string } {
-  const m = /^(.+?)\s+to\s+(.+)$/i.exec(period);
-  return m ? { start: m[1], end: m[2] } : { start: period, end: "—" };
-}
-
-function basisOf(shareClass: string, fallback: unknown): { display: string; basis: string } {
-  const m = /\((net|gross)\)\s*$/i.exec(shareClass);
-  return {
-    display: m ? shareClass.slice(0, m.index).trim() : shareClass,
-    basis: m ? m[1].toLowerCase() : str(fallback),
-  };
-}
+/** Ordered per the `return_skill` schema — annualized-return family first,
+ *  then risk-adjusted ratios — and only rendered when the source value is
+ *  reported, matching the design reference (a snapshot omits a row rather
+ *  than showing a blank "—" for a metric it doesn't report). */
+const NUMERIC_ROWS: { key: string; label: string; ratio?: boolean }[] = [
+  { key: "arithmetic_mean_monthly_pct", label: "Arithmetic Mean Monthly Pct" },
+  { key: "arithmetic_mean_annualized_pct", label: "Arithmetic Mean Annualized Pct" },
+  { key: "geometric_mean_monthly_pct", label: "Geometric Mean Monthly Pct" },
+  { key: "cagr_pct", label: "CAGR Pct" },
+  { key: "annualized_return_pct", label: "Annualized Return Pct" },
+  { key: "excess_return_pct", label: "Excess Return Pct" },
+  { key: "active_return_pct", label: "Active Return Pct" },
+  { key: "real_return_pct", label: "Real Return Pct" },
+  { key: "alpha_annualized_pct", label: "Alpha Annualized Pct" },
+  { key: "sharpe_ratio", label: "Sharpe Ratio", ratio: true },
+  { key: "sortino_ratio", label: "Sortino Ratio", ratio: true },
+  { key: "treynor_ratio", label: "Treynor Ratio", ratio: true },
+  { key: "information_ratio", label: "Information Ratio", ratio: true },
+  { key: "calmar_ratio", label: "Calmar Ratio", ratio: true },
+  { key: "sterling_ratio", label: "Sterling Ratio", ratio: true },
+  { key: "mar_ratio", label: "MAR Ratio", ratio: true },
+  { key: "omega_ratio", label: "Omega Ratio", ratio: true },
+  { key: "appraisal_ratio", label: "Appraisal Ratio", ratio: true },
+];
 
 function AnnualTable({ rows }: { rows: AnnualReturn[] }) {
   return (
@@ -67,14 +79,18 @@ function PerformanceCard({
   fundRef: string;
 }) {
   const [view, setView] = useState<"graph" | "table">("graph");
-  const { display: shareClassDisplay, basis } = basisOf(str(entry.share_class), entry.basis);
-  const { start, end } = splitPeriod(str(entry.period));
-  const statsPeriod = str(entry.statistics_period).replace(/_/g, " ");
+  const basis = str(entry.basis);
+  const period = str(entry.period);
+  const shareClass = str(entry.share_class);
+  const metaText = [shareClass !== "—" ? shareClass : null, period !== "—" ? period : null].filter(Boolean).join(" · ");
+  const statsPeriod = str(entry.statistics_period);
+  const statsPeriodDetail = str(entry.statistics_period_detail);
   const annualReturns = (Array.isArray(entry.annual_returns) ? entry.annual_returns : []) as AnnualReturn[];
   const plottable = annualReturns.filter(
     (a): a is { year: number; return_pct: number; is_net?: boolean } => typeof a.year === "number" && typeof a.return_pct === "number",
   );
   const canGraph = isSubject && plottable.length > 0;
+  const numericRows = NUMERIC_ROWS.filter((r) => typeof entry[r.key] === "number");
 
   return (
     <div className="card">
@@ -86,9 +102,7 @@ function PerformanceCard({
         ) : (
           <span className="badge other">{fundRef}</span>
         )}
-        <span className="meta">
-          {shareClassDisplay !== "—" ? shareClassDisplay : "—"} · {statsPeriod !== "—" ? statsPeriod : "—"}
-        </span>
+        {metaText && <span className="meta">{metaText}</span>}
         {canGraph && (
           <span className="seg">
             <button type="button" className={view === "graph" ? "on" : ""} onClick={() => setView("graph")}>
@@ -105,17 +119,27 @@ function PerformanceCard({
         <div className="k">Basis</div>
         <div className="v">{basis}</div>
         <div className="k">Period Start</div>
-        <div className="v">{start}</div>
+        <div className="v">{str(entry.period_start)}</div>
         <div className="k">Period End</div>
-        <div className="v">{end}</div>
-        <div className="k">Annualized Return</div>
-        <div className="v">{pct(entry.annualized_return_pct)}</div>
-        <div className="k">Sharpe Ratio</div>
-        <div className="v">{typeof entry.sharpe_ratio === "number" ? entry.sharpe_ratio.toFixed(2) : "—"}</div>
-        <div className="k">Statistics Period</div>
-        <div className="v">{statsPeriod}</div>
-        <div className="k">Statistics Period Detail</div>
-        <div className="v">{str(entry.statistics_period_detail)}</div>
+        <div className="v">{str(entry.period_end)}</div>
+        {numericRows.map((r) => (
+          <Fragment key={r.key}>
+            <div className="k">{r.label}</div>
+            <div className="v">{r.ratio ? (entry[r.key] as number).toFixed(2) : pct(entry[r.key], 2)}</div>
+          </Fragment>
+        ))}
+        {statsPeriod !== "—" && (
+          <>
+            <div className="k">Statistics Period</div>
+            <div className="v">{statsPeriod}</div>
+          </>
+        )}
+        {statsPeriodDetail !== "—" && (
+          <>
+            <div className="k">Statistics Period Detail</div>
+            <div className="v">{statsPeriodDetail}</div>
+          </>
+        )}
       </div>
       {annualReturns.length > 0 &&
         (canGraph && view === "graph" ? (

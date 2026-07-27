@@ -15,6 +15,9 @@ export interface PreferenceMetric {
   lookback?: boolean;
 }
 
+export type PreferenceRange = { lo: number; hi: number };
+export type PreferenceValues = Record<string, PreferenceRange>;
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -22,15 +25,20 @@ interface Props {
   description: string;
   metrics: PreferenceMetric[];
   notesPlaceholder: string;
+  /** Called with the current lo/hi ranges when the user clicks "Save
+   *  preferences" — lets a caller actually use a range (e.g. Alpha driving
+   *  the Selection Zone chart) instead of the dialog staying fully
+   *  decorative. Optional: dialogs with no live consumer can omit it. */
+  onApply?: (values: PreferenceValues) => void;
 }
 
-type Range = { lo: number; hi: number };
+type Range = PreferenceRange;
 
 /** Decorative dual-range slider dialog — mirrors the design reference's
  *  Preferences / Factor preferences modals. Sliders, notes, and lookback
  *  toggles are locally-held UI state only: Save closes the dialog without
  *  altering what the dashboard shows, same as the reference. */
-export function PreferenceDialog({ open, onClose, title, description, metrics, notesPlaceholder }: Props) {
+export function PreferenceDialog({ open, onClose, title, description, metrics, notesPlaceholder, onApply }: Props) {
   const defaults = (): Record<string, Range> =>
     Object.fromEntries(metrics.map((m) => [m.key, { lo: m.defaultLo, hi: m.defaultHi }]));
 
@@ -161,7 +169,14 @@ export function PreferenceDialog({ open, onClose, title, description, metrics, n
           <button className="btn pref-reset" type="button" onClick={reset}>
             Reset to defaults
           </button>
-          <button className="btn pref-save" type="button" onClick={onClose}>
+          <button
+            className="btn pref-save"
+            type="button"
+            onClick={() => {
+              onApply?.(values);
+              onClose();
+            }}
+          >
             Save preferences
           </button>
         </div>

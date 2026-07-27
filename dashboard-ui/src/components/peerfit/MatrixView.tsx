@@ -1,13 +1,29 @@
-import { useMemo } from "react";
-import { PEER_FUNDS, buildCorrelationMatrix, heatClass } from "./fixtures";
+import { useRenderer } from "../../api/hooks";
+import type { RunParams } from "../../api/types";
+import { LoadingState } from "../common/LoadingState";
+import { ErrorState } from "../common/ErrorState";
+import { heatClass } from "./heat";
 
 interface Props {
+  id: string;
   candidateName: string;
+  params: RunParams;
 }
 
-export function MatrixView({ candidateName }: Props) {
-  const names = useMemo(() => [candidateName, ...PEER_FUNDS.slice(0, 11)], [candidateName]);
-  const matrix = useMemo(() => buildCorrelationMatrix(names), [names]);
+export function MatrixView({ id, candidateName, params }: Props) {
+  const matrix = useRenderer<Record<string, unknown>>("D1-8", id, params);
+
+  if (matrix.loading) return <LoadingState label="Loading matrix…" />;
+  if (matrix.error || !matrix.data) return <ErrorState message={matrix.error ?? "Matrix unavailable"} />;
+
+  const names = matrix.data.schema.slice(1).map((c) => c.name);
+  const rows = matrix.data.rows;
+  const sourceByName = (matrix.data.attrs?.source_by_name as Record<string, string>) ?? {};
+
+  const cellClass = (rowName: string, colName: string) => {
+    if (sourceByName[rowName] === "Candidate peer" || sourceByName[colName] === "Candidate peer") return "cand-peer-cell";
+    return "";
+  };
 
   return (
     <div className="pl-view">
@@ -20,23 +36,30 @@ export function MatrixView({ candidateName }: Props) {
             <tr>
               <th className="corner">Fund</th>
               {names.map((n) => (
-                <th key={n} className={`col-h${n === candidateName ? " cand" : ""}`}>
+                <th key={n} className={`col-h${n === candidateName ? " cand" : ""} ${cellClass(n, n)}`}>
                   {n}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {names.map((rowName, i) => (
-              <tr key={rowName} className={rowName === candidateName ? "cand" : ""}>
-                <th className="row-h">{rowName}</th>
-                {names.map((_, j) => (
-                  <td key={j} className={i === j ? "diag" : heatClass(matrix[i][j])}>
-                    {i === j ? "—" : matrix[i][j].toFixed(2)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((row) => {
+              const rowName = String(row.index);
+              return (
+                <tr key={rowName} className={rowName === candidateName ? "cand" : ""}>
+                  <th className="row-h">{rowName}</th>
+                  {names.map((colName) => {
+                    const value = row[colName] as number;
+                    const isDiag = colName === rowName;
+                    return (
+                      <td key={colName} className={isDiag ? "diag" : `${heatClass(value)} ${cellClass(rowName, colName)}`}>
+                        {isDiag ? "—" : value.toFixed(2)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

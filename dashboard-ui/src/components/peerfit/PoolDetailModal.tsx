@@ -1,28 +1,52 @@
-import { POOL_MEMBERS, SIM_BASE } from "./fixtures";
+import { useRenderer } from "../../api/hooks";
+import type { RunParams } from "../../api/types";
+
+interface PoolMember {
+  name: string;
+  description: string;
+  weight: number;
+}
+
+interface Baseline {
+  ret: number;
+  vol: number;
+  sharpe: number;
+  dd: number;
+  corr: number;
+  ens: number;
+  var: number;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  id: string;
+  params: RunParams;
 }
 
-const BASELINE: [string, string][] = [
-  ["Ann. return", `+${SIM_BASE.ret.toFixed(1)}%`],
-  ["Ann. volatility", `${SIM_BASE.vol.toFixed(1)}%`],
-  ["Sharpe", SIM_BASE.sharpe.toFixed(2)],
-  ["Max drawdown", `${SIM_BASE.dd.toFixed(1)}%`],
-  ["Avg PM corr.", SIM_BASE.corr.toFixed(2)],
-  ["Effective N (ENS)", SIM_BASE.ens.toFixed(1)],
-  ["95% VaR (1d)", `${SIM_BASE.var.toFixed(1)}%`],
-  ["Members", String(POOL_MEMBERS.length)],
-];
-
 /** Current-pool detail modal — opened from the Simulator's "Current pool"
- *  info button. Renders the same POOL_MEMBERS/SIM_BASE fixtures the
- *  Simulator itself uses, so the two stay consistent. */
-export function PoolDetailModal({ open, onClose }: Props) {
+ *  info button. Fetches the same D1-9 renderer SimulatorView uses (baseline
+ *  fields are allocation-invariant), so the two stay consistent. */
+export function PoolDetailModal({ open, onClose, id, params }: Props) {
+  const pool = useRenderer<Record<string, unknown>>("D1-9", open ? id : null, params);
   if (!open) return null;
-  const total = POOL_MEMBERS.reduce((a, m) => a + m[2], 0);
-  const max = Math.max(...POOL_MEMBERS.map((m) => m[2]));
+
+  const attrs = pool.data?.attrs ?? {};
+  const poolMembers = (attrs.pool_members as PoolMember[]) ?? [];
+  const baseline = (attrs.baseline as Baseline) ?? { ret: 0, vol: 0, sharpe: 0, dd: 0, corr: 0, ens: 0, var: 0 };
+  const total = poolMembers.reduce((a, m) => a + m.weight, 0);
+  const max = Math.max(...poolMembers.map((m) => m.weight), 1);
+
+  const BASELINE: [string, string][] = [
+    ["Ann. return", `+${baseline.ret.toFixed(1)}%`],
+    ["Ann. volatility", `${baseline.vol.toFixed(1)}%`],
+    ["Sharpe", baseline.sharpe.toFixed(2)],
+    ["Max drawdown", `${baseline.dd.toFixed(1)}%`],
+    ["Avg PM corr.", baseline.corr.toFixed(2)],
+    ["Effective N (ENS)", baseline.ens.toFixed(1)],
+    ["95% VaR (1d)", `${baseline.var.toFixed(1)}%`],
+    ["Members", String(poolMembers.length)],
+  ];
 
   return (
     <div
@@ -47,7 +71,7 @@ export function PoolDetailModal({ open, onClose }: Props) {
             <span className="pm-banner-ic">i</span>
             <span>
               The simulator baseline is <strong>one Lighthouse master vehicle</strong> — a capital-weighted basket of
-              the <strong>{POOL_MEMBERS.length} active-book PMs</strong> that are members of it. Every marginal-impact
+              the <strong>{poolMembers.length} active-book PMs</strong> that are members of it. Every marginal-impact
               column in the Simulator is measured against <em>this</em> pool.
             </span>
           </div>
@@ -60,25 +84,25 @@ export function PoolDetailModal({ open, onClose }: Props) {
               <span>Weight</span>
             </div>
             <div className="pm-mem-scroll">
-              {POOL_MEMBERS.map((m, i) => {
-                const pct = (m[2] / total) * 100;
+              {poolMembers.map((m, i) => {
+                const memberPct = (m.weight / total) * 100;
                 return (
-                  <div className="pm-mem" key={m[0]}>
+                  <div className="pm-mem" key={m.name}>
                     <span className="pm-mem-rank">{i + 1}</span>
                     <span className="pm-mem-name">
-                      {m[0]}
-                      <small>{m[1]}</small>
+                      {m.name}
+                      <small>{m.description}</small>
                     </span>
                     <span className="pm-mem-bar">
-                      <i style={{ width: `${(m[2] / max) * 100}%` }} />
+                      <i style={{ width: `${(m.weight / max) * 100}%` }} />
                     </span>
-                    <span className="pm-mem-w">{pct.toFixed(1)}%</span>
+                    <span className="pm-mem-w">{memberPct.toFixed(1)}%</span>
                   </div>
                 );
               })}
             </div>
             <div className="pm-mem-foot">
-              <span>{POOL_MEMBERS.length} PMs</span>
+              <span>{poolMembers.length} PMs</span>
               <span>
                 Σ weights = <strong>100.0%</strong>
               </span>
@@ -87,10 +111,10 @@ export function PoolDetailModal({ open, onClose }: Props) {
           <div className="pm-sec">
             <div className="pm-sec-h">Baseline metrics — candidate-independent</div>
             <div className="pm-metrics">
-              {BASELINE.map(([l, v]) => (
+              {BASELINE.map(([l, valueStr]) => (
                 <div className="pm-met" key={l}>
                   <div className="pm-met-l">{l}</div>
-                  <div className="pm-met-v">{v}</div>
+                  <div className="pm-met-v">{valueStr}</div>
                 </div>
               ))}
             </div>

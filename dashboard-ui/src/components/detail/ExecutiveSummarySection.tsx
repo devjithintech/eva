@@ -6,58 +6,44 @@ interface Props {
 }
 
 /** Executive summary — narrative rows assembled from real record fields
- *  (strategy/manager/market_views/classification), each falling back to a
- *  short generic sentence when its source field is unreported rather than
- *  leaving a blank row. Matches the design reference: a plain exec-row list,
- *  no scoring widget. */
+ *  (executive_summary/strategy/manager/market_views/classification), most
+ *  falling back to a short generic sentence when their source field is
+ *  unreported rather than leaving a blank row. Matches the design reference:
+ *  a plain exec-row list, no scoring widget. */
 export function ExecutiveSummarySection({ rec }: Props) {
   const strategy = firstSection(rec, "strategy");
-  const manager = firstSection(rec, "manager");
   const marketViews = firstSection(rec, "market_views");
   const classification = firstSection(rec, "classification");
-  const fundName = str(firstSection(rec, "subject_fund").fund_name) !== "—" ? str(firstSection(rec, "subject_fund").fund_name) : rec.name;
+  const executiveSummary = firstSection(rec, "executive_summary");
 
   const rows: { label: string; text: string }[] = [
     {
       label: "Overview",
-      text:
-        str(strategy.description) !== "—"
-          ? str(strategy.description)
-          : `${fundName} is managed by ${str(manager.pm_name)}, focused on ${str(classification.strategy_family)}.`,
+      text: str(executiveSummary.overview),
     },
     {
       label: "Team",
-      text:
-        str(manager.key_person_risk_note) !== "—"
-          ? str(manager.key_person_risk_note)
-          : `${str(manager.pm_name)} (${str(manager.current_role)}) leads a team of ${str(manager.team_size)} at ${str(manager.current_firm)}.`,
+      text: str(executiveSummary.team),
     },
     {
       label: "Track Record",
-      text: `Track record begins ${str(classification.track_record_start_date) !== "—" ? str(classification.track_record_start_date) : str(classification.inception_date)}${
-        classification.is_track_record_audited === true ? ", independently audited" : classification.is_track_record_audited === false ? ", not independently audited" : ""
-      }.`,
+      text: str(executiveSummary.track_record),
     },
     {
       label: "Alpha Generation",
-      text: str(strategy.investment_thesis_core) !== "—" ? str(strategy.investment_thesis_core) : "No documented alpha thesis on record for this candidate.",
+      text: str(executiveSummary.alpha_generation),
     },
     {
       label: "Market Opportunity",
-      text: str(marketViews.macro_thesis) !== "—" ? str(marketViews.macro_thesis) : "No documented market view on record for this candidate.",
+      text: str(executiveSummary.market_opportunity),
     },
     {
       label: "Research Process",
-      text: str(strategy.idea_generation) !== "—" ? str(strategy.idea_generation) : "No documented research process on record for this candidate.",
+      text: str(executiveSummary.research_process),
     },
     {
       label: "AUM",
-      text: (() => {
-        const aum = firstScoped(classification.current_aum_usd_mn);
-        if (str(aum.value) === "—") return "AUM not disclosed for this candidate.";
-        const asOf = str(aum.as_of_date) !== "—" ? ` as of ${str(aum.as_of_date)}` : "";
-        return `Reported AUM was ${str(aum.value)}${asOf}.`;
-      })(),
+      text: str(executiveSummary.aum),
     },
   ];
 
@@ -65,7 +51,16 @@ export function ExecutiveSummarySection({ rec }: Props) {
     <section id="summary" className="sec">
       <div className="sec-head">
         <span className="sec-ic">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="3" y="4" width="18" height="7" rx="1.5" />
             <rect x="3" y="13" width="18" height="7" rx="1.5" />
           </svg>

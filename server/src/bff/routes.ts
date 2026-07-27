@@ -15,6 +15,7 @@ import {
   strategyLabel,
 } from "../data/candidates.js";
 import { allStages, funnelCounts, getStage, setStage, type Stage } from "../data/pipeline.js";
+import { CAND_PEERS, PEERFIT_LABELS, PEER_GROUPS, SAVED_GROUPS, buildPeerFitRenderer } from "../data/peerfit.js";
 import {
   archiveConversation,
   deleteConversation,
@@ -24,7 +25,7 @@ import {
   listConversations,
   renameConversation,
 } from "../db/conversationRepo.js";
-import type { CandidateRecord, CandidateSummary, Dataset } from "./types.js";
+import type { CandidateRecord, CandidateSummary, Dataset, RunParams } from "./types.js";
 
 /**
  * Backend-for-frontend, mounted at `/api`. Paths + descriptions mirror the
@@ -80,7 +81,7 @@ interface PeerSet {
   name: string;
   members: string[];
 }
-const peerSets: PeerSet[] = [];
+const peerSets: PeerSet[] = [{ id: "peerset-seed", ...SAVED_GROUPS }];
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}-${(++seq).toString(36)}${Date.now().toString(36)}`;
 
@@ -232,12 +233,15 @@ bff.put("/pipeline/:id", send(async (req) => {
 
 /* ── Peer data ────────────────────────────────────────────────────────────── */
 
-/** Pre-built peer groups (stub). */
-bff.get("/peer_groups", send(() => [
-  { id: "kr-eq-ls", name: "Korea equity long/short", memberCount: 0 },
-  { id: "global-macro", name: "Global macro", memberCount: 0 },
-  { id: "market-neutral", name: "Market neutral", memberCount: 0 },
-]));
+/** Pre-built peer groups (mock — see `data/peerfit.ts`; matches the guide's
+ *  `{name, count, source}` shape). */
+bff.get("/peer_groups", send(() => PEER_GROUPS));
+
+/** Candidate-peer roster for the "Configure comparison set" modal's
+ *  Candidates tab. Not in the Frontend API Guide (it assumes the frontend
+ *  already knows the evaluation queue) — a small addition so the UI has
+ *  something to pick `candidate_peer_set` entries from. */
+bff.get("/peer_candidates", send(() => CAND_PEERS));
 
 /** Peer names search — `?q=` filters candidate fund names. */
 bff.get("/peer_names", send(async (req) => {
@@ -283,7 +287,10 @@ bff.get("/runs/:id", send((req) => ({
 bff.get("/renderers", send(() => RENDERERS));
 
 /** Generic renderer endpoint — one handler serves `{label}` and every D1-x.
- *  Data is populated from data.json per label (per-fund via `?candidate=`). */
+ *  Data is populated from data.json per label (per-fund via `?candidate=`).
+ *  The 8 Peer Fit & Sim labels (D1-5/6/6b/7/7b/8/9/9b) instead return the
+ *  guide's `{schema, rows, attrs, identity}` envelope, backed by mock data —
+ *  see `PEERFIT_LABELS`/`buildPeerFitRenderer` in `data/peerfit.ts`. */
 bff.get("/renderers/:label", send((req) => {
   const r = RENDERER_BY_LABEL.get(req.params.label);
   if (!r) throw new DataNotFound(`Unknown renderer: ${req.params.label}`);
@@ -291,5 +298,19 @@ bff.get("/renderers/:label", send((req) => {
   // Fund selector — accept candidate / candidate_id / fund_id (strip ::suffix) / pm.
   const fundId = str(req.query.fund_id);
   const candidate = str(req.query.candidate) ?? str(req.query.candidate_id) ?? (fundId ? fundId.split("::")[0] : undefined) ?? str(req.query.pm);
+
+  if (PEERFIT_LABELS.has(r.label)) {
+    const rawParams = str(req.query.params);
+    let params: RunParams = {};
+    if (rawParams) {
+      try {
+        params = JSON.parse(rawParams) as RunParams;
+      } catch {
+        // malformed params — fall back to defaults rather than erroring the panel
+      }
+    }
+    return buildPeerFitRenderer(r.label, candidate ?? "", params, { source: str(req.query.source) });
+  }
+
   return { label: r.label, description: r.description, candidate: candidate ?? null, data: buildRendererData(r.label, candidate) };
 }));

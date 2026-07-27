@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CAND_PEERS, PEER_GROUPS, RECENT_GROUPS, SAVED_GROUPS } from "./fixtures";
+import { useCandidatePeers, usePeerGroups, usePeerSets } from "../../api/hooks";
 
 export type ConfigTab = "groups" | "candidates" | "recent";
 
@@ -16,15 +16,18 @@ interface Props {
   initialTab?: ConfigTab;
 }
 
-/** "Configure comparison set" modal — tabs for peer groups (a small
- *  illustrative stand-in list, not the mockup's fabricated 3,642-fund
- *  universe), candidate peers (real toggle over the CAND_PEERS fixture), and
- *  recent/saved sets. Draft state commits only on Apply, matching
- *  CandidateFilterDialog's convention. */
+/** "Configure comparison set" modal — tabs for peer groups (fetched from
+ *  `GET /peer_groups`), candidate peers (`GET /peer_candidates`, toggled into
+ *  `candidate_peer_set`), and recent/saved sets (`GET /peer_sets`). Draft
+ *  state commits only on Apply, matching CandidateFilterDialog's convention. */
 export function ConfigureComparisonModal({ open, onClose, peerGroupName, selectedPeerKeys, onApply, initialTab = "groups" }: Props) {
   const [tab, setTab] = useState<ConfigTab>(initialTab);
   const [draftGroup, setDraftGroup] = useState(peerGroupName);
   const [draftPeers, setDraftPeers] = useState<Set<string>>(selectedPeerKeys);
+
+  const peerGroups = usePeerGroups();
+  const candidatePeers = useCandidatePeers();
+  const peerSets = usePeerSets();
 
   useEffect(() => {
     if (open) {
@@ -35,6 +38,11 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
   }, [open, peerGroupName, selectedPeerKeys, initialTab]);
 
   if (!open) return null;
+
+  const groups = peerGroups.data ?? [];
+  const candPeers = candidatePeers.data ?? [];
+  const savedSets = peerSets.data ?? [];
+  const recentGroups = groups.slice(0, 2);
 
   const toggleCand = (key: string) =>
     setDraftPeers((prev) => {
@@ -56,7 +64,7 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
         <div className="modal-head">
           <div className="modal-title">
             Configure comparison set
-            <small>{PEER_GROUPS.length} peer groups · {CAND_PEERS.length} candidates in queue</small>
+            <small>{groups.length} peer groups · {candPeers.length} candidates in queue</small>
           </div>
           <button className="modal-close" aria-label="Close" onClick={onClose}>
             ×
@@ -77,7 +85,7 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
           {tab === "groups" && (
             <div className="modal-content">
               <div className="pg-list">
-                {PEER_GROUPS.map((g) => (
+                {groups.map((g) => (
                   <div
                     key={g.name}
                     className={`pg-card${g.name === draftGroup ? " selected" : ""}`}
@@ -85,7 +93,7 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
                   >
                     <div>
                       <div className="pg-card-name">{g.name}</div>
-                      <div className="pg-card-meta">{g.count} funds · LH internal</div>
+                      <div className="pg-card-meta">{g.count} funds · {g.source}</div>
                     </div>
                     <span className="pg-card-cnt">{g.count}</span>
                   </div>
@@ -106,7 +114,7 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
                   </div>
                   <div className="cp-box" style={{ color: "var(--primary)" }}>●</div>
                 </div>
-                {CAND_PEERS.map((c) => {
+                {candPeers.map((c) => {
                   const on = draftPeers.has(c.key);
                   return (
                     <div key={c.key} className={`cand-pick${on ? " on" : ""}`} onClick={() => toggleCand(c.key)}>
@@ -123,7 +131,7 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
               </div>
               <div style={{ padding: "14px 18px", fontSize: 12.5, color: "var(--muted)", borderTop: "1px solid var(--line)", lineHeight: 1.55 }}>
                 Candidate peers are other prospective candidates in this evaluation queue. Selecting them adds a
-                cohort comparison to the Snapshot tab and includes them in the Simulator.
+                cohort comparison to the Snapshot tab and includes them in the Simulator, Peer table, and Matrix.
               </div>
             </div>
           )}
@@ -132,11 +140,11 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
             <div className="modal-content" style={{ padding: "16px 20px" }}>
               <div className="pl-sh">Recent peer groups</div>
               <div className="pg-list single">
-                {RECENT_GROUPS.map((g) => (
+                {recentGroups.map((g) => (
                   <div key={g.name} className="pg-card" onClick={() => { setDraftGroup(g.name); setTab("groups"); }}>
                     <div>
                       <div className="pg-card-name">{g.name}</div>
-                      <div className="pg-card-meta">{g.meta} · {g.count} funds</div>
+                      <div className="pg-card-meta">{g.count} funds · {g.source}</div>
                     </div>
                     <span className="pg-card-cnt">{g.count}</span>
                   </div>
@@ -144,13 +152,13 @@ export function ConfigureComparisonModal({ open, onClose, peerGroupName, selecte
               </div>
               <div className="pl-sh" style={{ marginTop: 18 }}>Saved custom sets</div>
               <div className="pg-list single">
-                {SAVED_GROUPS.map((g) => (
-                  <div key={g.name} className="pg-card" onClick={() => { setDraftGroup(g.name); setTab("groups"); }}>
+                {savedSets.map((s) => (
+                  <div key={s.id} className="pg-card" onClick={() => { setDraftGroup(s.name); setTab("groups"); }}>
                     <div>
-                      <div className="pg-card-name">{g.name}</div>
-                      <div className="pg-card-meta">{g.meta} · {g.count} funds</div>
+                      <div className="pg-card-name">{s.name}</div>
+                      <div className="pg-card-meta">Custom · {s.members.length} funds</div>
                     </div>
-                    <span className="pg-card-cnt">{g.count}</span>
+                    <span className="pg-card-cnt">{s.members.length}</span>
                   </div>
                 ))}
               </div>

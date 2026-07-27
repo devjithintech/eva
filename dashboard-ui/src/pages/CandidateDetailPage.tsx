@@ -76,7 +76,7 @@ export function CandidateDetailPage({ id }: Props) {
           <AnalystFlagsSection id={id} />
           <OverviewSection rec={rec} />
           <PerformanceSection rec={rec} />
-          <ReturnsByFundSection id={id} rec={rec} />
+          <ReturnsByFundSection rec={rec} />
           <RiskSection rec={rec} />
           <BenchmarkActivenessSection rec={rec} />
           <StrategySection rec={rec} />

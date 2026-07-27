@@ -1,35 +1,45 @@
-import { PEER_FUNDS } from "./fixtures";
+import { useRenderer } from "../../api/hooks";
+import type { RunParams } from "../../api/types";
+import { LoadingState } from "../common/LoadingState";
+import { ErrorState } from "../common/ErrorState";
 
-interface Row {
-  name: string;
-  ytd: number;
-  ann: number;
-  vol: number;
+interface PeerRow {
+  fund: string;
+  row_type: "candidate" | "peer" | "median" | "candidate_peer" | "cohort_median";
+  source: string;
+  ytd_return: number;
+  annualised_return: number;
+  annualised_vol: number;
   sharpe: number;
-  dd: number;
-}
-
-function mockRow(name: string, i: number): Row {
-  // Deterministic mock figures, descending by sharpe like the reference table.
-  const sharpe = Math.max(0.3, 1.45 - i * 0.06);
-  return {
-    name,
-    ytd: 14.2 - i * 0.5,
-    ann: 12.7 - i * 0.4,
-    vol: 7.0 + i * 0.15,
-    sharpe: Math.round(sharpe * 100) / 100,
-    dd: -5.3 - i * 0.4,
-  };
+  max_drawdown: number;
 }
 
 interface Props {
+  id: string;
   candidateName: string;
+  params: RunParams;
   onOpenCandidates: () => void;
 }
 
-export function PeerTableView({ candidateName, onOpenCandidates }: Props) {
-  const rows: Row[] = [mockRow(candidateName, 0), ...PEER_FUNDS.map((n, i) => mockRow(n, i + 1))];
-  const median = rows[Math.floor(rows.length / 2)];
+const ROW_LABEL: Record<PeerRow["row_type"], string> = {
+  candidate: "SUBJECT",
+  candidate_peer: "CAND PEER",
+  cohort_median: "COHORT MED.",
+  median: "MEDIAN",
+  peer: "",
+};
+
+export function PeerTableView({ id, candidateName, params, onOpenCandidates }: Props) {
+  const table = useRenderer<PeerRow>("D1-6", id, params);
+
+  if (table.loading) return <LoadingState label="Loading peer table…" />;
+  if (table.error || !table.data) return <ErrorState message={table.error ?? "Peer table unavailable"} />;
+
+  const rows = table.data.rows;
+  const subject = rows.find((r) => r.row_type === "candidate");
+  const peerMedian = rows.find((r) => r.row_type === "median");
+  const peerCount = rows.filter((r) => r.row_type === "peer").length;
+  const hasCohort = rows.some((r) => r.row_type === "candidate_peer");
 
   return (
     <div className="pl-view">
@@ -38,7 +48,7 @@ export function PeerTableView({ candidateName, onOpenCandidates }: Props) {
           Peer group statistics — <span style={{ color: "var(--primary)", fontWeight: 600 }}>Mock reference set</span>
         </span>
         <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span>{rows.length - 1} peers · ranked by Sharpe</span>
+          <span>{peerCount} peers · ranked by Sharpe{hasCohort ? " · candidate peers included" : ""}</span>
           <button type="button" className="pl-sh-action" onClick={onOpenCandidates}>
             Candidates…
           </button>
@@ -47,27 +57,27 @@ export function PeerTableView({ candidateName, onOpenCandidates }: Props) {
       <div className="peer-strip">
         <div className="peer-kpi">
           <div className="pk-l">YTD return</div>
-          <div className="pk-v pos">+{rows[0].ytd.toFixed(1)}%</div>
+          <div className="pk-v pos">+{((subject?.ytd_return ?? 0) * 100).toFixed(1)}%</div>
         </div>
         <div className="peer-kpi">
           <div className="pk-l">Ann. return</div>
-          <div className="pk-v pos">+{rows[0].ann.toFixed(1)}%</div>
+          <div className="pk-v pos">+{((subject?.annualised_return ?? 0) * 100).toFixed(1)}%</div>
         </div>
         <div className="peer-kpi">
           <div className="pk-l">Ann. vol</div>
-          <div className="pk-v">{rows[0].vol.toFixed(1)}%</div>
+          <div className="pk-v">{((subject?.annualised_vol ?? 0) * 100).toFixed(1)}%</div>
         </div>
         <div className="peer-kpi">
           <div className="pk-l">Sharpe</div>
-          <div className="pk-v pos">{rows[0].sharpe.toFixed(2)}</div>
+          <div className="pk-v pos">{(subject?.sharpe ?? 0).toFixed(2)}</div>
         </div>
         <div className="peer-kpi">
           <div className="pk-l">Max DD</div>
-          <div className="pk-v">{rows[0].dd.toFixed(1)}%</div>
+          <div className="pk-v">{((subject?.max_drawdown ?? 0) * 100).toFixed(1)}%</div>
         </div>
         <div className="peer-kpi">
           <div className="pk-l">Peer median Sharpe</div>
-          <div className="pk-v">{median.sharpe.toFixed(2)}</div>
+          <div className="pk-v">{(peerMedian?.sharpe ?? 0).toFixed(2)}</div>
         </div>
       </div>
       <div className="peer-tbl-wrap">
@@ -84,13 +94,18 @@ export function PeerTableView({ candidateName, onOpenCandidates }: Props) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.name} className={i === 0 ? "cand" : ""}>
-                <td>{i === 0 ? `${r.name} — subject` : r.name}</td>
-                <td className="pos">+{r.ytd.toFixed(1)}%</td>
-                <td className="pos">+{r.ann.toFixed(1)}%</td>
-                <td>{r.vol.toFixed(1)}%</td>
+              <tr key={`${r.fund}-${i}`} className={r.row_type === "candidate" ? "cand" : r.row_type === "candidate_peer" || r.row_type === "cohort_median" ? "cand-peer" : ""}>
+                <td>
+                  {r.row_type === "candidate" ? `${candidateName} — subject` : r.fund}
+                  {ROW_LABEL[r.row_type] && r.row_type !== "candidate" && (
+                    <span className="ctag" style={{ marginLeft: 6 }}>{ROW_LABEL[r.row_type]}</span>
+                  )}
+                </td>
+                <td className="pos">+{(r.ytd_return * 100).toFixed(1)}%</td>
+                <td className="pos">+{(r.annualised_return * 100).toFixed(1)}%</td>
+                <td>{(r.annualised_vol * 100).toFixed(1)}%</td>
                 <td>{r.sharpe.toFixed(2)}</td>
-                <td>{r.dd.toFixed(1)}%</td>
+                <td>{(r.max_drawdown * 100).toFixed(1)}%</td>
               </tr>
             ))}
           </tbody>

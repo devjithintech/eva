@@ -42,6 +42,28 @@ function loadDataset(): RawDataset {
 /** Coerce a value to a finite number, else null. */
 export const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
+/** Every scoped entry for a section, preferring subject-fund scope when any
+ *  exists (falls back to all entries only when the subject has none at all —
+ *  never substitutes a sibling/other fund's numbers for the subject's). */
+function allSubjectEntries(c: Record<string, unknown>, k: string): Record<string, unknown>[] {
+  const v = c[k];
+  if (!Array.isArray(v)) return v ? [v as Record<string, unknown>] : [];
+  const arr = v as Record<string, unknown>[];
+  const subject = arr.filter((e) => e && e.fund_ref === "subject");
+  return subject.length ? subject : arr;
+}
+
+/** First non-null value across scoped entries, in array order — rescues a
+ *  metric (e.g. Sharpe) that's null on the "primary" entry `sec()` would
+ *  pick, but present on another real snapshot for the same fund. */
+function firstNonNull(entries: Record<string, unknown>[], get: (e: Record<string, unknown>) => number | null): number | null {
+  for (const e of entries) {
+    const v = get(e);
+    if (v != null) return v;
+  }
+  return null;
+}
+
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 /** Candidate names currently in the dataset (the map keys). */
@@ -246,12 +268,13 @@ export function buildOpportunityMap(): OpportunityMapPayload {
 
   const points = entries
     .map(([name, c]) => {
-      const rs = sec(c, "return_skill");
-      const dd = sec(c, "downside_distribution");
-      const cagr = num(rs.cagr_pct) ?? num(rs.annualized_return_pct);
-      const drawdown = num(dd.max_drawdown_pct);
+      const rsAll = allSubjectEntries(c, "return_skill");
+      const ddAll = allSubjectEntries(c, "downside_distribution");
+      const cagr = firstNonNull(rsAll, (e) => num(e.cagr_pct) ?? num(e.annualized_return_pct));
+      const drawdown = firstNonNull(ddAll, (e) => num(e.max_drawdown_pct));
+      const alpha = firstNonNull(rsAll, (e) => num(e.alpha_annualized_pct) ?? num(e.active_return_pct) ?? num(e.excess_return_pct));
       return cagr != null && drawdown != null
-        ? { name, cagr, dd: drawdown, stage: getStage(slugify(name)) }
+        ? { name, cagr, dd: drawdown, alpha, stage: getStage(slugify(name)) }
         : null;
     })
     .filter((p): p is OppPoint => p !== null);
@@ -277,14 +300,22 @@ export function buildCandidatePool(n = 10, all = false): CandidatePoolPayload {
   const limit = Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 10;
   const ds = loadDataset();
   const rows: MatrixRow[] = Object.entries(ds.candidates).map(([name, c]) => {
-    const rs = sec(c, "return_skill");
-    const dd = sec(c, "downside_distribution");
+    // `return_skill`/`downside_distribution` are arrays of as-reported
+    // snapshots (one per factsheet/period) — a single field can be null on
+    // the "primary" snapshot but populated on another for the same subject
+    // fund, so each metric is resolved independently across all of them
+    // rather than all four being read off one picked entry.
+    const rsAll = allSubjectEntries(c, "return_skill");
+    const ddAll = allSubjectEntries(c, "downside_distribution");
+    const baAll = allSubjectEntries(c, "benchmark_activeness");
     return {
       name,
-      cagr: num(rs.cagr_pct) ?? num(rs.annualized_return_pct),
-      sharpe: num(rs.sharpe_ratio),
-      alpha: num(rs.alpha_annualized_pct) ?? num(rs.active_return_pct) ?? num(rs.excess_return_pct),
-      dd: num(dd.max_drawdown_pct),
+      cagr: firstNonNull(rsAll, (e) => num(e.cagr_pct) ?? num(e.annualized_return_pct)),
+      sharpe: firstNonNull(rsAll, (e) => num(e.sharpe_ratio)),
+      alpha: firstNonNull(rsAll, (e) => num(e.alpha_annualized_pct) ?? num(e.active_return_pct) ?? num(e.excess_return_pct)),
+      dd: firstNonNull(ddAll, (e) => num(e.max_drawdown_pct)),
+      infoRatio: firstNonNull(rsAll, (e) => num(e.information_ratio)),
+      beta: firstNonNull(baAll, (e) => num(e.beta)),
       you: name.toLowerCase() === "anda",
     };
   });
@@ -719,8 +750,6 @@ export function buildAnalystFlags(query?: string): AnalystFlagsPayload {
   const flags = raw
     .map((s) => String(s))
     .map((s) => ({ title: flagTitle(s), detail: s, severity: flagSeverity(s) }));
-  const order = { high: 0, medium: 1, low: 2 } as const;
-  flags.sort((a, b) => order[a.severity] - order[b.severity]);
   const counts = {
     high: flags.filter((f) => f.severity === "high").length,
     medium: flags.filter((f) => f.severity === "medium").length,

@@ -587,6 +587,298 @@ table.annual {
   fill: var(--primary);
 }
 
+/* returns by fund — monthly cumulative growth chart with hover tooltip */
+.mn-graph {
+  max-width: 880px;
+  margin-top: 4px;
+}
+.mn-graph .g-title {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: #6c7280;
+}
+.mn-graph .g-axis {
+  stroke: var(--line);
+}
+.mn-graph .g-grid {
+  stroke: #e8e6e1;
+  stroke-dasharray: 3 3;
+}
+.mn-graph .g-zero {
+  stroke: #b6bcc6;
+}
+.mn-graph .g-line {
+  fill: none;
+  stroke: #38663a;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+.mn-graph .g-dot {
+  fill: #38663a;
+}
+.mn-graph .g-tick {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  fill: var(--muted);
+}
+.mn-graph .g-lab {
+  font-family: var(--sans);
+  font-size: 11px;
+  fill: var(--muted);
+}
+.mn-graph .g-leg {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  fill: var(--ink);
+}
+.mn-graph.net .g-line {
+  stroke: #03a9f4;
+}
+.mn-graph.gross .g-line {
+  stroke: #f4c203;
+}
+.mn-graph svg {
+  cursor: crosshair;
+}
+.g-focus {
+  stroke: #fff;
+  stroke-width: 1.6;
+}
+.g-xline {
+  stroke: #d4d2cc;
+  stroke-width: 1;
+}
+.mn-graph.net .g-focus {
+  fill: #03a9f4;
+}
+.mn-graph.gross .g-focus {
+  fill: #f4c203;
+}
+.g-tip {
+  position: fixed;
+  z-index: 999;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 24px rgba(20, 23, 28, 0.12);
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.55;
+  min-width: 150px;
+}
+.g-tip b {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-family: var(--mono);
+  margin-bottom: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.g-tip span {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--muted);
+}
+.g-tip i {
+  font-style: normal;
+  font-family: var(--mono);
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.g-tip i.up {
+  color: var(--teal);
+}
+.g-tip i.dn {
+  color: var(--neg);
+}
+
+/* returns by fund — per-vehicle fund cards */
+.sec-body h4 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1b1d23;
+  margin: 18px 0 8px;
+}
+.sec-body h4:first-of-type {
+  margin-top: 4px;
+}
+.sec-body h4 .seg {
+  float: right;
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--soft);
+  margin-top: -4px;
+}
+.sec-body h4 .seg button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 3px 11px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sec-body h4 .seg button.on {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.fund-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+  margin-top: 14px;
+  background: var(--soft2);
+}
+.fund-card:first-of-type {
+  margin-top: 0;
+}
+.fund-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fund-name {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.fund-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+.fchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.fchip {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 9px;
+  font-size: 12px;
+}
+.fchip b {
+  color: var(--muted);
+  font-weight: 500;
+  margin-right: 5px;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+table.returns-grid {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  width: 100%;
+}
+.returns-grid th {
+  padding: 6px 8px 6px 0;
+  text-align: right;
+  white-space: nowrap;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.returns-grid th:first-child {
+  text-align: left;
+}
+.returns-grid td {
+  padding: 4px 8px 4px 0;
+  white-space: nowrap;
+  color: #39414c;
+}
+.returns-grid td.num {
+  text-align: right;
+  padding-right: 14px;
+  font-family: var(--mono);
+}
+.returns-grid td.num.neg {
+  color: var(--neg);
+}
+.returns-grid td.blank {
+  color: var(--faint);
+  text-align: center;
+  padding-right: 14px;
+  font-family: var(--mono);
+}
+.show-more {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--ink);
+  border-radius: 7px;
+  padding: 5px 14px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.show-more:hover {
+  background: #fff;
+}
+
+/* returns by fund — portfolio value area chart */
+.pf-graph {
+  margin-top: 6px;
+}
+.pf-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.pf-scroll svg {
+  display: block;
+}
+.pf-title {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 650;
+  color: #6c7280;
+  text-align: center;
+  margin-top: 8px;
+}
+.pf-graph .g-grid {
+  stroke: #eceae5;
+  stroke-dasharray: 3 3;
+}
+.pf-graph .g-axis {
+  stroke: var(--line);
+}
+.pf-graph .g-tick {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  fill: var(--muted);
+}
+.pf-graph .g-lab {
+  font-family: var(--sans);
+  font-size: 11px;
+  fill: var(--muted);
+}
+.pf-graph .vlbl {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  fill: #4b515c;
+}
+
 /* section-level table/card toggle (Risk & downside) */
 .sec-head .seg {
   margin-left: auto;
@@ -684,4 +976,29 @@ table.annual {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.risk-tbl tr.latest td {
+  background: #f8f7fe;
+}
+.risk-tbl tr.latest td:first-child {
+  border-left: none;
+  background: #f8f7fe;
+  padding-left: 16px;
+}
+.chip-latest {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.risk-tbl tr.latest td.dd b {
+  background: #fdeeea;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-weight: inherit;
 }

@@ -42,3 +42,44 @@ export interface PoolData {
   count: number;
   candidates: CandidateSummary[];
 }
+
+/**
+ * Renderer `params` — parsed from the `params` JSON-string query param on
+ * `GET /renderers/:label`, per FRONTEND_API_GUIDE_v6.pdf's `RunParams`
+ * contract. All fields optional; used by the Peer Fit & Sim renderers
+ * (D1-5/6/6b/7/7b/8/9/9b) — see `server/src/data/peerfit.ts`.
+ */
+export interface RunParams {
+  peer_group?: string;
+  peer_set?: string[];
+  window_start?: string;
+  window_end?: string;
+  benchmark?: string;
+  risk_free?: string;
+  allocation_pct?: number;
+  gross_exposure?: number;
+  net_exposure?: number;
+  kelly_multiplier?: number;
+  regime_selector?: string;
+  /** Other candidate-fund keys/names to compare the subject against. */
+  candidate_peer_set?: string[];
+  /** false = drop the established peer universe, candidate cohort only. */
+  include_peer_universe?: boolean;
+}
+
+/** Who/what a renderer result describes. */
+export interface Identity {
+  scope: "Candidate" | "Fund" | "Book";
+  fund_id: string | null;
+  fund_name: string | null;
+  candidate_id: string | null;
+  pm_id: string | null;
+}
+
+/** Universal renderer response envelope (per the Frontend API Guide). */
+export interface RendererEnvelope<TRow = Record<string, unknown>> {
+  schema: { name: string; type: string }[];
+  rows: TRow[];
+  attrs?: Record<string, unknown>;
+  identity: Identity;
+}

@@ -1,39 +1,317 @@
 import { useState } from "react";
-import { useReturns } from "../../api/hooks";
-import { firstSection, str } from "../../api/sections";
 import type { CandidateRecord } from "../../api/types";
-import { LoadingState } from "../common/LoadingState";
-import { ErrorState } from "../common/ErrorState";
-import { GrowthCurveGraph } from "./GrowthCurveGraph";
+import { AnnualBarGraph } from "./AnnualBarGraph";
+import { MonthlyGrowthGraph, MONTHS } from "./MonthlyGrowthGraph";
+import type { MonthlyPoint } from "./MonthlyGrowthGraph";
+import { PortfolioValueGraph } from "./PortfolioValueGraph";
 
 interface Props {
-  id: string;
   rec: CandidateRecord;
 }
 
-/** Compound a year-by-year return series into a growth-of-100 cumulative
- *  curve, expressed as cumulative % gain from the start (same math as the
- *  reference's own `buildGraph()`, just annual instead of monthly steps). */
-function growthOf100(calendar: { year: string; value: number }[]): { label: string; value: number }[] {
-  let cum = 100;
-  return calendar.map((c) => {
-    cum *= 1 + c.value / 100;
-    return { label: c.year, value: cum - 100 };
-  });
+type Basis = "net" | "gross";
+
+interface Series {
+  dates: string[];
+  values: number[];
 }
 
-/** Returns by fund — reuses the same GET /api/candidates/:id/returns data
- *  PerformanceSection charts, rendered as a Graph/Table toggle (default:
- *  graph) for the subject fund's real annual return series — same
- *  AnnualBarGraph component and toggle convention as Performance. Sibling
- *  funds (real, from subject_fund.sibling_funds) are listed by name only —
- *  this dataset has no per-sibling annual-returns series. */
-export function ReturnsByFundSection({ id, rec }: Props) {
-  const { data, loading, error } = useReturns(id);
+interface FundReturns {
+  monthly: Record<Basis, Series>;
+  annual: Record<Basis, Series>;
+}
+
+interface PortfolioRow {
+  instrument?: string;
+  market_value?: number;
+  currency?: string;
+}
+
+interface FundRecord {
+  fund_id?: string;
+  fund_name?: string;
+  strategy?: string | null;
+  aum?: number | null;
+  aum_currency?: string | null;
+  submitted_at?: string | null;
+  portfolio?: PortfolioRow[];
+  returns?: FundReturns;
+}
+
+function fmtAum(aum: unknown, currency: unknown): string | null {
+  if (typeof aum !== "number") return null;
+  const ccy = typeof currency === "string" && currency ? ` ${currency}` : "";
+  return `${(aum / 1e9).toFixed(2)}bn${ccy}`;
+}
+
+function fmtDate(iso: unknown): string {
+  return typeof iso === "string" && iso.length >= 10 ? iso.slice(0, 10) : "—";
+}
+
+/** Cumulative growth-of-100, month over month, from decimal fractional
+ *  returns (0.0317 = +3.17%) — same math as the reference's own buildGraph(). */
+function monthlyGrowth(series: Series): MonthlyPoint[] {
+  let cum = 100;
+  const out: MonthlyPoint[] = [];
+  for (let i = 0; i < series.dates.length; i++) {
+    const v = series.values[i];
+    if (typeof v !== "number") continue;
+    cum *= 1 + v;
+    out.push({ date: series.dates[i], value: cum - 100, ret: v * 100 });
+  }
+  return out;
+}
+
+/** Year × month raw-return grid for the Table view of a monthly series. */
+function monthlyGrid(series: Series): { years: string[]; grid: Record<string, (number | null)[]> } {
+  const grid: Record<string, (number | null)[]> = {};
+  const years: string[] = [];
+  for (let i = 0; i < series.dates.length; i++) {
+    const year = series.dates[i].slice(0, 4);
+    const month = Number(series.dates[i].slice(5, 7)) - 1;
+    if (!grid[year]) {
+      grid[year] = new Array(12).fill(null);
+      years.push(year);
+    }
+    const v = series.values[i];
+    grid[year][month] = typeof v === "number" ? v * 100 : null;
+  }
+  return { years, grid };
+}
+
+function annualRows(series: Series): { label: string; value: number }[] {
+  return series.dates
+    .map((d, i) => ({ label: d.slice(0, 4), value: series.values[i] }))
+    .filter((r): r is { label: string; value: number } => typeof r.value === "number")
+    .map((r) => ({ label: r.label, value: r.value * 100 }));
+}
+
+const basisLabel = (b: Basis) => (b === "net" ? "Net" : "Gross");
+
+function MonthlyReturnsBlock({ basis, series }: { basis: Basis; series: Series }) {
   const [view, setView] = useState<"graph" | "table">("graph");
-  const subjectFund = firstSection(rec, "subject_fund");
-  const fundName = str(subjectFund.fund_name) !== "—" ? str(subjectFund.fund_name) : rec.name;
-  const siblings = (Array.isArray(subjectFund.sibling_funds) ? subjectFund.sibling_funds : []) as { fund_name?: string }[];
+  const points = monthlyGrowth(series);
+  const { years, grid } = monthlyGrid(series);
+
+  return (
+    <>
+      <h4>
+        Monthly · {basisLabel(basis)}
+        <span className="seg">
+          <button type="button" className={view === "graph" ? "on" : ""} onClick={() => setView("graph")}>
+            Graph
+          </button>
+          <button type="button" className={view === "table" ? "on" : ""} onClick={() => setView("table")}>
+            Table
+          </button>
+        </span>
+      </h4>
+      {view === "graph" ? (
+        <MonthlyGrowthGraph points={points} basis={basisLabel(basis)} basisKey={basis} />
+      ) : (
+        <table className="returns-grid">
+          <thead>
+            <tr>
+              <th>Year</th>
+              {MONTHS.map((m) => (
+                <th key={m}>{m}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {years.map((y) => (
+              <tr key={y}>
+                <td>{y}</td>
+                {grid[y].map((v, i) =>
+                  v == null ? (
+                    <td className="num blank" key={i}>
+                      ·
+                    </td>
+                  ) : (
+                    <td className={`num ${v < 0 ? "neg" : ""}`} key={i}>
+                      {v.toFixed(2)}%
+                    </td>
+                  ),
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+function AnnualReturnsBlock({ basis, series, showBasis }: { basis: Basis; series: Series; showBasis: boolean }) {
+  const [view, setView] = useState<"graph" | "table">("graph");
+  const rows = annualRows(series);
+
+  return (
+    <>
+      <h4>
+        {showBasis ? `Annual · ${basisLabel(basis)}` : "Annual"}
+        <span className="seg">
+          <button type="button" className={view === "graph" ? "on" : ""} onClick={() => setView("graph")}>
+            Graph
+          </button>
+          <button type="button" className={view === "table" ? "on" : ""} onClick={() => setView("table")}>
+            Table
+          </button>
+        </span>
+      </h4>
+      {view === "graph" ? (
+        <AnnualBarGraph rows={rows} />
+      ) : (
+        <table className="data annual">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th className="r">Return</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label}>
+                <td>{r.label}</td>
+                <td className={`num ${r.value >= 0 ? "pos" : "neg"}`}>
+                  {r.value >= 0 ? "+" : ""}
+                  {r.value.toFixed(2)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+/** Portfolio holdings — a tiered value-area chart of the fund's long
+ *  (positive market-value) positions, largest first, toggled against the
+ *  same flat instrument table, exactly like the reference's own
+ *  "Portfolio (N)" block. The graph only builds when there are at least 3
+ *  positive-value rows to plot (a long/short book can be nearly all
+ *  zero/negative rows after netting) — otherwise it's table-only, same as
+ *  the reference's own `if(data.length<3)return;` guard. */
+function PortfolioBlock({ portfolio }: { portfolio: PortfolioRow[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const [view, setView] = useState<"graph" | "list">("graph");
+  const positive = portfolio
+    .map((p) => ({ instrument: p.instrument ?? "—", value: p.market_value ?? 0 }))
+    .filter((p) => p.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const canGraph = positive.length >= 3;
+  const currency = portfolio.find((p) => p.currency)?.currency ?? "";
+  const visible = expanded ? portfolio : portfolio.slice(0, 10);
+
+  return (
+    <>
+      <h4>
+        Portfolio ({portfolio.length})
+        {canGraph && (
+          <span className="seg">
+            <button type="button" className={view === "graph" ? "on" : ""} onClick={() => setView("graph")}>
+              Graph
+            </button>
+            <button type="button" className={view === "list" ? "on" : ""} onClick={() => setView("list")}>
+              List
+            </button>
+          </span>
+        )}
+      </h4>
+      {canGraph && view === "graph" ? (
+        <PortfolioValueGraph rows={positive} currency={currency} />
+      ) : (
+        <>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Instrument</th>
+                <th className="r">Market value</th>
+                <th>Ccy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.instrument ?? "—"}</td>
+                  <td className="num">
+                    {typeof p.market_value === "number" ? p.market_value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}
+                  </td>
+                  <td className="basis">{p.currency ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {portfolio.length > 10 && (
+            <button type="button" className="show-more" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? "Show less" : `Show all ${portfolio.length} instruments`}
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+const BASES: Basis[] = ["net", "gross"];
+const emptySeries: Series = { dates: [], values: [] };
+
+/** One fund's real portfolio + monthly/annual return series (`fund.portfolio`,
+ *  `fund.returns`), matching the reference's fund-card exactly — monthly
+ *  wins over annual per basis when both are reported, since that's the
+ *  richer of the two. */
+function FundCard({ fund }: { fund: FundRecord }) {
+  const returns = fund.returns;
+  const monthlyBases = BASES.filter((b) => (returns?.monthly[b]?.dates.length ?? 0) > 0);
+  const annualOnlyBases = BASES.filter(
+    (b) => !monthlyBases.includes(b) && (returns?.annual[b]?.dates.length ?? 0) > 0,
+  );
+  const portfolio = Array.isArray(fund.portfolio) ? fund.portfolio : [];
+
+  const aum = fmtAum(fund.aum, fund.aum_currency);
+  const chips: { label: string; value: string }[] = [];
+  if (aum) chips.push({ label: "AUM", value: aum });
+  if (typeof fund.strategy === "string" && fund.strategy) chips.push({ label: "Strategy", value: fund.strategy });
+  chips.push({ label: "As of", value: fmtDate(fund.submitted_at) });
+
+  return (
+    <div className="fund-card">
+      <div className="fund-head">
+        <span className="fund-name">{fund.fund_name ?? "—"}</span>
+        <span className="fund-id">{fund.fund_id ?? ""}</span>
+      </div>
+      <div className="fchips">
+        {chips.map((c) => (
+          <span className="fchip" key={c.label}>
+            <b>{c.label}</b>
+            {c.value}
+          </span>
+        ))}
+      </div>
+      {monthlyBases.map((b) => (
+        <MonthlyReturnsBlock key={b} basis={b} series={returns?.monthly[b] ?? emptySeries} />
+      ))}
+      {annualOnlyBases.map((b) => (
+        <AnnualReturnsBlock key={b} basis={b} series={returns?.annual[b] ?? emptySeries} showBasis={annualOnlyBases.length > 1} />
+      ))}
+      {monthlyBases.length === 0 && annualOnlyBases.length === 0 && (
+        <p className="note">No return series on record for this fund.</p>
+      )}
+      {portfolio.length > 0 && <PortfolioBlock portfolio={portfolio} />}
+    </div>
+  );
+}
+
+/** Returns by fund — one card per real vehicle in `rec.funds` (subject fund,
+ *  siblings, and any other reported vehicle alike): its own name/id, AUM +
+ *  strategy + as-of chips, monthly (or annual, when that's all that's
+ *  reported) return series, and portfolio holdings. Not gated by a
+ *  subject/sibling badge like Performance — every fund the record actually
+ *  reports returns data for gets its own card, exactly as the reference
+ *  renders this section. */
+export function ReturnsByFundSection({ rec }: Props) {
+  const funds = (Array.isArray(rec.funds) ? rec.funds : []) as FundRecord[];
 
   return (
     <section id="returns" className="sec">
@@ -49,62 +327,10 @@ export function ReturnsByFundSection({ id, rec }: Props) {
         <h2>Returns by fund</h2>
       </div>
       <div className="sec-body">
-        {loading && <LoadingState label="Loading returns…" />}
-        {!loading && (error || !data) && <ErrorState message={error ?? "No returns available"} />}
-        {!loading && data && (
-          <div className="card">
-            <div className="card-head">
-              <span style={{ fontWeight: 650, fontSize: 15 }}>{fundName}</span>
-              {data.calendar.length > 0 && (
-                <span className="seg">
-                  <button type="button" className={view === "graph" ? "on" : ""} onClick={() => setView("graph")}>
-                    Graph
-                  </button>
-                  <button type="button" className={view === "table" ? "on" : ""} onClick={() => setView("table")}>
-                    Table
-                  </button>
-                </span>
-              )}
-            </div>
-            {data.calendar.length === 0 ? (
-              <p className="note">No annual return series on record for this fund.</p>
-            ) : view === "graph" ? (
-              <GrowthCurveGraph points={growthOf100(data.calendar)} />
-            ) : (
-              <table className="data" style={{ maxWidth: 360 }}>
-                <thead>
-                  <tr>
-                    <th>Year</th>
-                    <th className="r">Return</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.calendar.map((c) => (
-                    <tr key={c.year}>
-                      <td>{c.year}</td>
-                      <td className={`num ${c.value >= 0 ? "pos" : "neg"}`}>
-                        {c.value >= 0 ? "+" : ""}
-                        {c.value.toFixed(2)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-
-        {siblings.length > 0 && (
-          <>
-            <h3>Sibling funds</h3>
-            <p className="note">Detailed returns aren't tracked for sibling vehicles in this dataset.</p>
-            <ul>
-              {siblings.map((s, i) => (
-                <li key={i}>{str(s.fund_name)}</li>
-              ))}
-            </ul>
-          </>
-        )}
+        {funds.length === 0 && <p className="note">No fund-level returns on record for this candidate.</p>}
+        {funds.map((f, i) => (
+          <FundCard key={f.fund_id ?? i} fund={f} />
+        ))}
       </div>
     </section>
   );

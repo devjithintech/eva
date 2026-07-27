@@ -39,6 +39,8 @@ export interface MatrixRow {
   sharpe: number | null;
   alpha: number | null;
   dd: number | null;
+  infoRatio: number | null;
+  beta: number | null;
   you?: boolean;
 }
 
@@ -120,11 +122,73 @@ export interface ComparisonPayload {
   sections: ComparisonSection[];
 }
 
+/**
+ * Renderer `params` — sent as a JSON-encoded `params` query string on
+ * `GET /renderers/:label`, per FRONTEND_API_GUIDE_v6.pdf's `RunParams`
+ * contract. All fields optional; used by the Peer Fit & Sim renderers
+ * (D1-5/6/6b/7/7b/8/9/9b).
+ */
+export interface RunParams {
+  peer_group?: string;
+  peer_set?: string[];
+  window_start?: string;
+  window_end?: string;
+  benchmark?: string;
+  risk_free?: string;
+  allocation_pct?: number;
+  gross_exposure?: number;
+  net_exposure?: number;
+  kelly_multiplier?: number;
+  regime_selector?: string;
+  /** Other candidate-fund keys/names to compare the subject against. */
+  candidate_peer_set?: string[];
+  /** false = drop the established peer universe, candidate cohort only. */
+  include_peer_universe?: boolean;
+}
+
+/** Who/what a renderer result describes. */
+export interface Identity {
+  scope: "Candidate" | "Fund" | "Book";
+  fund_id: string | null;
+  fund_name: string | null;
+  candidate_id: string | null;
+  pm_id: string | null;
+}
+
+/** Universal renderer response envelope (per the Frontend API Guide). */
+export interface RendererEnvelope<TRow = Record<string, unknown>> {
+  schema: { name: string; type: string }[];
+  rows: TRow[];
+  attrs?: Record<string, unknown>;
+  identity: Identity;
+}
+
+/** A pre-built peer group (`GET /peer_groups`). */
+export interface PeerGroup {
+  name: string;
+  count: number;
+  source: string;
+}
+
+/** A candidate-peer roster entry (`GET /peer_candidates`) — a valid
+ *  `candidate_peer_set` member for the Peer Fit & Sim renderers. */
+export interface CandPeer {
+  key: string;
+  short: string;
+  fund: string;
+  cand: string;
+  ret: number;
+  vol: number;
+  dd: number;
+  corr: number;
+}
+
 /** One plotted candidate on the opportunity scatter (CAGR × drawdown). */
 export interface OppPoint {
   name: string;
   cagr: number;
   dd: number;
+  alpha: number | null;
   stage: "scored" | "shortlisted" | "interview";
 }
 

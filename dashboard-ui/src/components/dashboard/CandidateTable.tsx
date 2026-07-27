@@ -16,10 +16,11 @@ type SortKey = "alpha" | "cagr" | "sharpe" | "dd";
 
 interface Props {
   rows: TableRow[];
-  scores: Map<string, number>;
+  scores: Map<string, number | null>;
   compareMode: boolean;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
+  onShortlist: (id: string) => void;
   onAdvance: (id: string) => void;
   onReject: (id: string) => void;
 }
@@ -36,7 +37,7 @@ const fmtNum = (v: number | null) => (v == null ? "—" : v.toFixed(2));
 
 type ActionType = "select" | "share" | "note" | "reject";
 
-export function CandidateTable({ rows, scores, compareMode, selected, onToggleSelect, onAdvance, onReject }: Props) {
+export function CandidateTable({ rows, scores, compareMode, selected, onToggleSelect, onShortlist, onAdvance, onReject }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("alpha");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
   const [action, setAction] = useState<{ type: ActionType; id: string; name: string } | null>(null);
@@ -109,7 +110,9 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
               <td className="r neg">{fmtPct(r.dd)}</td>
               <td className="cl-more" onClick={(e) => e.stopPropagation()}>
                 <RowActionsMenu
+                  showShortlist={r.stage !== "shortlisted" && r.stage !== "interview"}
                   showInterview={r.stage !== "interview"}
+                  onShortlist={() => onShortlist(r.id)}
                   onSelectInterview={() => setAction({ type: "select", id: r.id, name: r.name })}
                   onShare={() => setAction({ type: "share", id: r.id, name: r.name })}
                   onAddNote={() => setAction({ type: "note", id: r.id, name: r.name })}

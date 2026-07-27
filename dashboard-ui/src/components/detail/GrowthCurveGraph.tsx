@@ -3,7 +3,7 @@
  *  own script); this dataset only has annual returns, so this plots the
  *  same growth-of-100 concept at annual granularity instead — a real
  *  computed series, not a stand-in bar chart. */
-function niceStep(span: number): number {
+export function niceStep(span: number): number {
   const raw = span / 4;
   const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
   const norm = raw / mag;

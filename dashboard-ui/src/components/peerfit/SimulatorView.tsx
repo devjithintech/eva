@@ -1,8 +1,48 @@
 import { useMemo, useState } from "react";
-import { CAND_PEERS, POOL_MEMBERS, SIM_BASE, simCompute } from "./fixtures";
+import { useRenderer } from "../../api/hooks";
+import type { RunParams } from "../../api/types";
+import { LoadingState } from "../common/LoadingState";
+import { ErrorState } from "../common/ErrorState";
+
+interface SimRow {
+  metric: string;
+  label: string;
+  current: number;
+  proposed: number;
+  delta: number;
+  format: string;
+}
+
+interface CohortRow {
+  rank: number;
+  fund_id: string;
+  is_subject: boolean;
+  short: string;
+  ret: number;
+  vol: number;
+  sharpe: number;
+  dd: number;
+  ens: number;
+  var: number;
+  dRet: number;
+  dVol: number;
+  dSharpe: number;
+  dDD: number;
+  dENS: number;
+  max_pm_corr: number;
+  fit_zone: "diversifying" | "approaching" | "penalty";
+}
+
+interface PoolMember {
+  name: string;
+  description: string;
+  weight: number;
+}
 
 interface Props {
+  id: string;
   candidateName: string;
+  params: RunParams;
   selectedPeerKeys: Set<string>;
   onOpenPoolDetail: () => void;
 }
@@ -16,32 +56,24 @@ const PRESETS: { label: string; alloc: number }[] = [
 
 const POOL_COLORS = ["#9facd9", "#dc8e88", "#e4bd81", "#c2cd9c", "#90abb2", "#b7a1cc", "#d0c48a", "#8fbfae"];
 
-export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetail }: Props) {
+export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }: Props) {
   const [alloc, setAlloc] = useState(5);
 
-  const candidates = useMemo(
-    () => [
-      { key: "subject", short: candidateName, fund: candidateName, ret: 12.7, vol: 7.0, dd: -5.3, corr: 0.53, subject: true },
-      ...CAND_PEERS.filter((c) => selectedPeerKeys.has(c.key)).map((c) => ({
-        key: c.key,
-        short: c.short,
-        fund: c.fund,
-        ret: c.ret,
-        vol: c.vol,
-        dd: c.dd,
-        corr: c.corr,
-        subject: false,
-      })),
-    ],
-    [candidateName, selectedPeerKeys],
-  );
+  const simParams = useMemo<RunParams>(() => ({ ...params, allocation_pct: alloc / 100 }), [params, alloc]);
+  const pool = useRenderer<SimRow>("D1-9", id, simParams);
+  const cohort = useRenderer<CohortRow>("D1-9b", id, simParams);
 
-  const results = candidates
-    .map((c) => ({ c, r: simCompute(alloc, c) }))
-    .sort((a, b) => b.r.dENS - a.r.dENS);
+  if (pool.loading || cohort.loading) return <LoadingState label="Loading simulator…" />;
+  if (pool.error || !pool.data) return <ErrorState message={pool.error ?? "Simulator unavailable"} />;
+  if (cohort.error || !cohort.data) return <ErrorState message={cohort.error ?? "Simulator unavailable"} />;
 
+  const byMetric = new Map(pool.data.rows.map((r) => [r.metric, r]));
+  const attrs = pool.data.attrs ?? {};
+  const poolMembers = (attrs.pool_members as PoolMember[]) ?? [];
+  const totalWeight = (attrs.pool_total_weight as number) ?? poolMembers.reduce((a, m) => a + m.weight, 0);
+
+  const results = cohort.data.rows;
   const best = results[0];
-  const totalWeight = POOL_MEMBERS.reduce((a, m) => a + m[2], 0);
 
   const d = (v: number, digits = 2, invertGood = false) => {
     const good = invertGood ? v <= 0 : v >= 0;
@@ -93,6 +125,11 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
               Identical criteria are applied to every candidate, into the same mock target pool — the marginal-impact
               columns are directly comparable.
             </p>
+            {selectedPeerKeys.size === 0 && (
+              <p className="note" style={{ marginTop: 8 }}>
+                No candidate peers selected — showing the subject only.
+              </p>
+            )}
           </div>
           <div className="sim-results">
             <div className="pool-card">
@@ -100,27 +137,27 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
                 <span>
                   Current pool —{" "}
                   <button type="button" className="pool-info-btn" onClick={onOpenPoolDetail} title="What is the current pool?">
-                    <span className="ig">i</span>LH Diversified · {POOL_MEMBERS.length} PMs
+                    <span className="ig">i</span>LH Diversified · {poolMembers.length} PMs
                   </button>
                 </span>
                 <span style={{ color: "var(--muted)" }}>100%</span>
               </div>
               <div className="pool-bar">
-                {POOL_MEMBERS.map((m, i) => (
+                {poolMembers.map((m, i) => (
                   <div
-                    key={m[0]}
+                    key={m.name}
                     className="pool-seg"
-                    style={{ width: `${(m[2] / totalWeight) * 100}%`, background: POOL_COLORS[i % POOL_COLORS.length] }}
+                    style={{ width: `${(m.weight / totalWeight) * 100}%`, background: POOL_COLORS[i % POOL_COLORS.length] }}
                   >
-                    {((m[2] / totalWeight) * 100).toFixed(0)}%
+                    {((m.weight / totalWeight) * 100).toFixed(0)}%
                   </div>
                 ))}
               </div>
               <div className="pool-legend">
-                {POOL_MEMBERS.map((m, i) => (
-                  <span key={m[0]}>
+                {poolMembers.map((m, i) => (
+                  <span key={m.name}>
                     <span className="pool-legend-dot" style={{ background: POOL_COLORS[i % POOL_COLORS.length] }} />
-                    {m[0]}
+                    {m.name}
                   </span>
                 ))}
               </div>
@@ -133,8 +170,8 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
                     <th>Marginal impact at {alloc.toFixed(1)}%</th>
                     <th>Current pool</th>
                     {results.map((x, i) => (
-                      <th key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        #{i + 1} {x.c.short}
+                      <th key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        #{i + 1} {x.short}
                       </th>
                     ))}
                   </tr>
@@ -142,46 +179,46 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
                 <tbody>
                   <tr>
                     <td>Ann. return</td>
-                    <td>+{SIM_BASE.ret.toFixed(1)}%</td>
+                    <td>+{(byMetric.get("annualised_return")?.current ?? 0).toFixed(1)}%</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {(x.r.ret >= 0 ? "+" : "") + x.r.ret.toFixed(1)}% {d(x.r.dRet, 2)}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {(x.ret >= 0 ? "+" : "") + x.ret.toFixed(1)}% {d(x.dRet, 2)}
                       </td>
                     ))}
                   </tr>
                   <tr>
                     <td>Ann. volatility</td>
-                    <td>{SIM_BASE.vol.toFixed(1)}%</td>
+                    <td>{(byMetric.get("annualised_vol")?.current ?? 0).toFixed(1)}%</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {x.r.vol.toFixed(1)}% {d(x.r.dVol, 2, true)}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.vol.toFixed(1)}% {d(x.dVol, 2, true)}
                       </td>
                     ))}
                   </tr>
                   <tr>
                     <td>Sharpe</td>
-                    <td>{SIM_BASE.sharpe.toFixed(2)}</td>
+                    <td>{(byMetric.get("sharpe")?.current ?? 0).toFixed(2)}</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {x.r.sharpe.toFixed(2)} {d(x.r.dSharpe, 2)}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.sharpe.toFixed(2)} {d(x.dSharpe, 2)}
                       </td>
                     ))}
                   </tr>
                   <tr>
                     <td>Max drawdown</td>
-                    <td>{SIM_BASE.dd.toFixed(1)}%</td>
+                    <td>{(byMetric.get("max_drawdown")?.current ?? 0).toFixed(1)}%</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {x.r.dd.toFixed(1)}% {d(x.r.dDD, 2)}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.dd.toFixed(1)}% {d(x.dDD, 2)}
                       </td>
                     ))}
                   </tr>
                   <tr>
                     <td>Effective N (ENS)</td>
-                    <td>{SIM_BASE.ens.toFixed(1)}</td>
+                    <td>{(byMetric.get("ens")?.current ?? 0).toFixed(1)}</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {x.r.ens.toFixed(1)} {d(x.r.dENS, 2)}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.ens.toFixed(1)} {d(x.dENS, 2)}
                       </td>
                     ))}
                   </tr>
@@ -189,8 +226,8 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
                     <td>Max pool corr</td>
                     <td>—</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {x.r.maxcorr.toFixed(2)}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.max_pm_corr.toFixed(2)}
                       </td>
                     ))}
                   </tr>
@@ -198,8 +235,8 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
                     <td>Verdict</td>
                     <td>—</td>
                     {results.map((x) => (
-                      <td key={x.c.key} className={x.c.subject ? "subj" : ""}>
-                        {x.r.zone === "pen" ? "PENALTY" : x.r.zone === "app" ? "APPROACHING" : "DIVERSIFYING"}
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.fit_zone.toUpperCase()}
                       </td>
                     ))}
                   </tr>
@@ -207,11 +244,11 @@ export function SimulatorView({ candidateName, selectedPeerKeys, onOpenPoolDetai
               </table>
             </div>
 
-            <div className={`sim-callout${best.r.zone === "pen" ? " bad" : ""}`}>
-              <strong>Best fit — {best.c.short}</strong> at {alloc.toFixed(1)}% into Lighthouse Diversified: ENS Δ{" "}
-              {best.r.dENS >= 0 ? "+" : ""}
-              {best.r.dENS.toFixed(2)}, Sharpe Δ {best.r.dSharpe >= 0 ? "+" : ""}
-              {best.r.dSharpe.toFixed(2)}, max pool corr {best.r.maxcorr.toFixed(2)}.
+            <div className={`sim-callout${best.fit_zone === "penalty" ? " bad" : ""}`}>
+              <strong>Best fit — {best.short}</strong> at {alloc.toFixed(1)}% into Lighthouse Diversified: ENS Δ{" "}
+              {best.dENS >= 0 ? "+" : ""}
+              {best.dENS.toFixed(2)}, Sharpe Δ {best.dSharpe >= 0 ? "+" : ""}
+              {best.dSharpe.toFixed(2)}, max pool corr {best.max_pm_corr.toFixed(2)}.
             </div>
           </div>
         </div>

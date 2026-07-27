@@ -345,6 +345,12 @@
   background: var(--primary-soft);
   font-weight: 600;
 }
+.peer-tbl tr.cand-peer td {
+  background: rgba(14, 124, 134, 0.08);
+}
+.peer-tbl tr.cand-peer .ctag {
+  background: var(--teal);
+}
 .peer-tbl td.pos {
   color: var(--pf-pos);
 }
@@ -506,6 +512,13 @@
   background: var(--primary-soft);
   color: var(--primary);
   font-weight: 700;
+}
+.matrix td.cand-peer-cell {
+  outline: 1px solid rgba(14, 124, 134, 0.35);
+  outline-offset: -1px;
+}
+.matrix th.cand-peer-cell {
+  color: var(--teal);
 }
 
 /* simulator */

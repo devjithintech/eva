@@ -5,10 +5,14 @@ import type {
   CandidateMatrix,
   CandidateRecord,
   CandidateSummary,
+  CandPeer,
   ComparisonPayload,
   OpportunityMapData,
+  PeerGroup,
   PipelineState,
+  RendererEnvelope,
   ReturnsPayload,
+  RunParams,
   ScorecardPayload,
   Stage,
 } from "./types";
@@ -118,3 +122,32 @@ export const useCompare = (ids: string[]) =>
 
 /** Opportunity map (scatter points + funnel + pool composition). */
 export const useOpportunityMap = () => useResource<OpportunityMapData>("/opportunity-map");
+
+/** Generic D1-x renderer call (`GET /renderers/{label}`) — used by the Peer
+ *  Fit & Sim panels. `params` is URL-encoded as the `params` JSON query
+ *  string per the Frontend API Guide's `RunParams` contract. Pass a null
+ *  `fundId` to skip. */
+export function useRenderer<TRow = Record<string, unknown>>(
+  label: string,
+  fundId: string | null,
+  params?: RunParams,
+): Resource<RendererEnvelope<TRow>> {
+  const query = params && Object.keys(params).length ? `&params=${encodeURIComponent(JSON.stringify(params))}` : "";
+  const path = fundId == null ? null : `/renderers/${label}?candidate_id=${encodeURIComponent(fundId)}${query}`;
+  return useResource<RendererEnvelope<TRow>>(path);
+}
+
+/** Pre-built peer groups for the Configure-comparison-set modal. */
+export const usePeerGroups = () => useResource<PeerGroup[]>("/peer_groups");
+
+/** Candidate-peer roster for the Configure-comparison-set modal's
+ *  Candidates tab (valid `candidate_peer_set` members). */
+export const useCandidatePeers = () => useResource<CandPeer[]>("/peer_candidates");
+
+/** Saved custom peer sets (Recent & saved tab). */
+export interface PeerSet {
+  id: string;
+  name: string;
+  members: string[];
+}
+export const usePeerSets = () => useResource<PeerSet[]>("/peer_sets");

@@ -12,13 +12,12 @@ import type { MatrixRow } from "../api/types";
  * candidate on expand/detail view. This table-level number is a fast,
  * transparent preview only.
  */
-export function computeScores(rows: MatrixRow[]): Map<string, number> {
+export function computeScores(rows: MatrixRow[]): Map<string, number | null> {
   const range = (vals: (number | null)[]): [number, number] => {
     const xs = vals.filter((v): v is number => v != null);
     return xs.length ? [Math.min(...xs), Math.max(...xs)] : [0, 1];
   };
-  const norm = (v: number | null, [lo, hi]: [number, number], invert = false) => {
-    if (v == null) return 0.5; // neutral when unreported
+  const norm = (v: number, [lo, hi]: [number, number], invert = false) => {
     const t = hi === lo ? 0.5 : (v - lo) / (hi - lo);
     return invert ? 1 - t : t;
   };
@@ -28,14 +27,30 @@ export function computeScores(rows: MatrixRow[]): Map<string, number> {
   const alphaR = range(rows.map((r) => r.alpha));
   const ddR = range(rows.map((r) => r.dd)); // more negative = worse, so invert
 
-  const out = new Map<string, number>();
+  // [value, range, weight, invert]
+  const FIELDS = (r: MatrixRow): [number | null, [number, number], number, boolean][] => [
+    [r.cagr, cagrR, 0.3, false],
+    [r.sharpe, sharpeR, 0.3, false],
+    [r.alpha, alphaR, 0.25, false],
+    [r.dd, ddR, 0.15, true],
+  ];
+
+  const out = new Map<string, number | null>();
   for (const r of rows) {
-    const composite =
-      0.3 * norm(r.cagr, cagrR) +
-      0.3 * norm(r.sharpe, sharpeR) +
-      0.25 * norm(r.alpha, alphaR) +
-      0.15 * norm(r.dd, ddR, true);
-    out.set(r.name, Math.round(composite * 100));
+    // Missing fields are excluded (not filled with a fabricated "neutral"
+    // 0.5) and the remaining weights renormalized over whatever is actually
+    // reported — otherwise a candidate with NO real data at all lands on a
+    // flat weighted-neutral 50, which can outrank candidates who have real,
+    // merely middling, figures. A candidate with zero real data gets no
+    // score at all ("—") rather than a misleadingly average-looking one.
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (const [value, valueRange, weight, invert] of FIELDS(r)) {
+      if (value == null) continue;
+      weightedSum += weight * norm(value, valueRange, invert);
+      weightTotal += weight;
+    }
+    out.set(r.name, weightTotal > 0 ? Math.round((weightedSum / weightTotal) * 100) : null);
   }
   return out;
 }

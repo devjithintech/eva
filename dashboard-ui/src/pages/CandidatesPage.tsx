@@ -1,34 +1,170 @@
 import { useMemo, useState } from "react";
-import { useCandidateMatrix, useCandidates, usePipeline, useSetStage } from "../api/hooks";
+import {
+  useCandidateMatrix,
+  useCandidates,
+  usePipeline,
+  useSetStage,
+} from "../api/hooks";
 import type { CandidateSummary, Stage } from "../api/types";
 import { computeScores } from "../lib/score";
+import { matchesPreferences } from "../lib/preferences";
 import { Breadcrumbs } from "../components/layout/Breadcrumbs";
-import { PipelineTabs, type DashboardTab } from "../components/dashboard/PipelineTabs";
+import {
+  PipelineTabs,
+  type DashboardTab,
+} from "../components/dashboard/PipelineTabs";
 import { AzFilterStrip } from "../components/dashboard/AzFilterStrip";
-import { CandidateTable, type TableRow } from "../components/dashboard/CandidateTable";
+import {
+  CandidateTable,
+  type TableRow,
+} from "../components/dashboard/CandidateTable";
 import { CompareDrawer } from "../components/dashboard/CompareDrawer";
 import { InsightsPanel } from "../components/dashboard/InsightsPanel";
-import { PreferenceDialog, type PreferenceMetric } from "../components/dashboard/PreferenceDialog";
-import { CandidateFilterDialog, EMPTY_FILTER, type CandidateFilterState } from "../components/dashboard/CandidateFilterDialog";
+import {
+  PreferenceDialog,
+  type PreferenceMetric,
+  type PreferenceRange,
+  type PreferenceValues,
+} from "../components/dashboard/PreferenceDialog";
+import {
+  CandidateFilterDialog,
+  EMPTY_FILTER,
+  type CandidateFilterState,
+} from "../components/dashboard/CandidateFilterDialog";
 import { LoadingState } from "../components/common/LoadingState";
 import { ErrorState } from "../components/common/ErrorState";
 import { CONVERSATION_URL } from "../lib/env";
 
+const DEFAULT_ALPHA_RANGE: PreferenceRange = { lo: 5, hi: 30 };
+
 const PREFERENCE_METRICS: PreferenceMetric[] = [
-  { key: "cagr", label: "CAGR", min: 0, max: 30, step: 0.5, defaultLo: 8, defaultHi: 25, format: (v) => `${v.toFixed(0)}%` },
-  { key: "sharpe", label: "Sharpe", min: 0, max: 4, step: 0.1, defaultLo: 1, defaultHi: 3, format: (v) => v.toFixed(1) },
-  { key: "info", label: "Info Ratio", min: 0, max: 3, step: 0.1, defaultLo: 0.5, defaultHi: 2, format: (v) => v.toFixed(1) },
-  { key: "beta", label: "Net Beta", min: -0.5, max: 1.5, step: 0.05, defaultLo: 0, defaultHi: 0.6, format: (v) => v.toFixed(2) },
-  { key: "maxdd", label: "Max DD", min: -30, max: 0, step: 1, defaultLo: -15, defaultHi: 0, format: (v) => `${v.toFixed(0)}%` },
+  {
+    key: "alpha",
+    label: "Alpha",
+    min: -30,
+    max: 30,
+    step: 5,
+    defaultLo: DEFAULT_ALPHA_RANGE.lo,
+    defaultHi: DEFAULT_ALPHA_RANGE.hi,
+    format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`,
+  },
+  {
+    key: "cagr",
+    label: "CAGR",
+    min: 0,
+    max: 30,
+    step: 0.5,
+    defaultLo: 8,
+    defaultHi: 25,
+    format: (v) => `${v.toFixed(0)}%`,
+  },
+  {
+    key: "sharpe",
+    label: "Sharpe",
+    min: 0,
+    max: 4,
+    step: 0.1,
+    defaultLo: 1,
+    defaultHi: 3,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    key: "info",
+    label: "Info Ratio",
+    min: 0,
+    max: 3,
+    step: 0.1,
+    defaultLo: 0.5,
+    defaultHi: 2,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    key: "beta",
+    label: "Net Beta",
+    min: -0.5,
+    max: 1.5,
+    step: 0.05,
+    defaultLo: 0,
+    defaultHi: 0.6,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    key: "maxdd",
+    label: "Max DD",
+    min: -30,
+    max: 0,
+    step: 1,
+    defaultLo: -15,
+    defaultHi: 0,
+    format: (v) => `${v.toFixed(0)}%`,
+  },
 ];
+
+/** Ranges used to define "shortlisted" until the user saves their own —
+ *  mirrors PreferenceDialog's own default-init so the tab has a sensible
+ *  starting definition instead of depending on manual pipeline actions. */
+const DEFAULT_PREF_VALUES: PreferenceValues = Object.fromEntries(
+  PREFERENCE_METRICS.map((m) => [m.key, { lo: m.defaultLo, hi: m.defaultHi }]),
+);
 
 const SIZE_LABELS = ["Micro", "Small", "Mid", "Large", "Mega"];
 const FACTOR_METRICS: PreferenceMetric[] = [
-  { key: "value", label: "Value", sub: "Price-to-earnings vs peers · lower = cheaper", min: 0, max: 50, step: 1, defaultLo: 8, defaultHi: 18, format: (v) => `${v.toFixed(0)}×` },
-  { key: "momentum", label: "Momentum", sub: "Trailing return · winners keep winning", min: -20, max: 80, step: 1, defaultLo: 5, defaultHi: 40, format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`, lookback: true },
-  { key: "minvol", label: "Min Volatility", sub: "Annualised standard deviation · lower = steadier", min: 0, max: 40, step: 0.5, defaultLo: 5, defaultHi: 15, format: (v) => `${v.toFixed(0)}%` },
-  { key: "quality", label: "Quality", sub: "Return on equity · profitability, low leverage", min: 0, max: 40, step: 1, defaultLo: 12, defaultHi: 30, format: (v) => `${v.toFixed(0)}%` },
-  { key: "size", label: "Size", sub: "Market-cap bucket · Micro <$300M → Mega >$200B", min: 0, max: 4, step: 1, defaultLo: 1, defaultHi: 3, format: (v) => SIZE_LABELS[Math.round(v)] },
+  {
+    key: "value",
+    label: "Value",
+    sub: "Price-to-earnings vs peers · lower = cheaper",
+    min: 0,
+    max: 50,
+    step: 1,
+    defaultLo: 8,
+    defaultHi: 18,
+    format: (v) => `${v.toFixed(0)}×`,
+  },
+  {
+    key: "momentum",
+    label: "Momentum",
+    sub: "Trailing return · winners keep winning",
+    min: -20,
+    max: 80,
+    step: 1,
+    defaultLo: 5,
+    defaultHi: 40,
+    format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`,
+    lookback: true,
+  },
+  {
+    key: "minvol",
+    label: "Min Volatility",
+    sub: "Annualised standard deviation · lower = steadier",
+    min: 0,
+    max: 40,
+    step: 0.5,
+    defaultLo: 5,
+    defaultHi: 15,
+    format: (v) => `${v.toFixed(0)}%`,
+  },
+  {
+    key: "quality",
+    label: "Quality",
+    sub: "Return on equity · profitability, low leverage",
+    min: 0,
+    max: 40,
+    step: 1,
+    defaultLo: 12,
+    defaultHi: 30,
+    format: (v) => `${v.toFixed(0)}%`,
+  },
+  {
+    key: "size",
+    label: "Size",
+    sub: "Market-cap bucket · Micro <$300M → Mega >$200B",
+    min: 0,
+    max: 4,
+    step: 1,
+    defaultLo: 1,
+    defaultHi: 3,
+    format: (v) => SIZE_LABELS[Math.round(v)],
+  },
 ];
 
 export function CandidatesPage() {
@@ -44,6 +180,9 @@ export function CandidatesPage() {
   const [view, setView] = useState<"dashboard" | "compare">("dashboard");
   const [prefOpen, setPrefOpen] = useState(false);
   const [factorOpen, setFactorOpen] = useState(false);
+  const [alphaRange, setAlphaRange] =
+    useState<PreferenceRange>(DEFAULT_ALPHA_RANGE);
+  const [prefValues, setPrefValues] = useState<PreferenceValues | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filter, setFilter] = useState<CandidateFilterState>(EMPTY_FILTER);
 
@@ -65,9 +204,40 @@ export function CandidatesPage() {
     return m;
   }, [candidates.data]);
 
-  const scores = useMemo(() => (matrix.data ? computeScores(matrix.data.rows) : new Map<string, number>()), [matrix.data]);
+  const scores = useMemo(
+    () =>
+      matrix.data
+        ? computeScores(matrix.data.rows)
+        : new Map<string, number | null>(),
+    [matrix.data],
+  );
 
-  const filterActive = filter.currency != null || filter.region != null || filter.strategy.length > 0;
+  const filterActive =
+    filter.currency != null ||
+    filter.region != null ||
+    filter.strategy.length > 0;
+  const prefsActive = prefValues != null;
+
+  /** Tab badge counts — mirrors the membership rules in `rows` below (stage
+   *  for Scored/Interview, matchesPreferences for Shortlisted) so the number
+   *  on each tab always matches what clicking into it actually shows. */
+  const tabCounts = useMemo(() => {
+    if (!matrix.data || !pipeline.data) return null;
+    const effective = prefValues ?? DEFAULT_PREF_VALUES;
+    let scored = 0;
+    let shortlisted = 0;
+    let interview = 0;
+    for (const r of matrix.data.rows) {
+      const id = nameToId.get(r.name);
+      if (!id) continue;
+      const stage: Stage = pipeline.data.stages[id] ?? "scored";
+      if (stage === "rejected") continue;
+      scored++;
+      if (matchesPreferences(r, effective)) shortlisted++;
+      if (stage === "interview") interview++;
+    }
+    return { scored, shortlisted, interview, stages: pipeline.data.stages };
+  }, [matrix.data, pipeline.data, nameToId, prefValues]);
 
   const rows: TableRow[] = useMemo(() => {
     if (!matrix.data || !pipeline.data) return [];
@@ -82,19 +252,40 @@ export function CandidatesPage() {
       .filter((r) => (az ? r.name.trim().toUpperCase().startsWith(az) : true))
       .filter((r) => {
         if (tab === "scored") return r.stage !== "rejected";
-        if (tab === "shortlisted") return r.stage === "shortlisted" || r.stage === "interview";
+        if (tab === "shortlisted")
+          return (
+            r.stage !== "rejected" &&
+            matchesPreferences(r, prefValues ?? DEFAULT_PREF_VALUES)
+          );
         return r.stage === "interview";
       })
       .filter((r) => {
         if (!filterActive) return true;
         const summary = summaryByName.get(r.name);
         if (!summary) return false;
-        if (filter.currency && summary.currency !== filter.currency) return false;
-        if (filter.region && !summary.regions.includes(filter.region)) return false;
-        if (filter.strategy.length > 0 && !filter.strategy.includes(summary.strategy)) return false;
+        if (filter.currency && summary.currency !== filter.currency)
+          return false;
+        if (filter.region && !summary.regions.includes(filter.region))
+          return false;
+        if (
+          filter.strategy.length > 0 &&
+          !filter.strategy.includes(summary.strategy)
+        )
+          return false;
         return true;
       });
-  }, [matrix.data, pipeline.data, nameToId, flagCountByName, summaryByName, filter, filterActive, az, tab]);
+  }, [
+    matrix.data,
+    pipeline.data,
+    nameToId,
+    flagCountByName,
+    summaryByName,
+    filter,
+    prefValues,
+    filterActive,
+    az,
+    tab,
+  ]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -105,6 +296,10 @@ export function CandidatesPage() {
     });
   };
 
+  const shortlist = async (id: string) => {
+    await setStage(id, "shortlisted");
+    pipeline.refresh();
+  };
   const advance = async (id: string) => {
     await setStage(id, "interview");
     pipeline.refresh();
@@ -115,12 +310,22 @@ export function CandidatesPage() {
   };
 
   if (view === "compare") {
-    return <CompareDrawer ids={Array.from(selected)} onBack={() => setView("dashboard")} />;
+    return (
+      <CompareDrawer
+        ids={Array.from(selected)}
+        onBack={() => setView("dashboard")}
+      />
+    );
   }
 
   return (
     <div className="container cf-wrap">
-      <Breadcrumbs items={[{ label: "Home", href: CONVERSATION_URL }, { label: "Candidates & Funds" }]} />
+      <Breadcrumbs
+        items={[
+          { label: "Home", href: CONVERSATION_URL },
+          { label: "Candidates & Funds" },
+        ]}
+      />
 
       <div className="dash-head">
         <div className="dash-title">
@@ -135,21 +340,60 @@ export function CandidatesPage() {
               setSelected(new Set());
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <path d="M9 3v18" />
             </svg>
             Compare
           </button>
-          <button type="button" className="btn btn-ico" title="Factor preferences" aria-label="Factor preferences" onClick={() => setFactorOpen(true)}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="btn btn-ico"
+            title="Factor preferences"
+            aria-label="Factor preferences"
+            onClick={() => setFactorOpen(true)}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polygon points="12 2 2 7 12 12 22 7 12 2" />
               <polyline points="2 17 12 22 22 17" />
               <polyline points="2 12 12 17 22 12" />
             </svg>
           </button>
-          <button type="button" className="btn btn-ico" title="Preferences" aria-label="Preferences" onClick={() => setPrefOpen(true)}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="btn btn-ico"
+            title="Preferences"
+            aria-label="Preferences"
+            onClick={() => setPrefOpen(true)}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="4" y1="21" x2="4" y2="14" />
               <line x1="4" y1="10" x2="4" y2="3" />
               <line x1="12" y1="21" x2="12" y2="12" />
@@ -162,52 +406,143 @@ export function CandidatesPage() {
             </svg>
           </button>
           {compareMode && (
-            <button className="btn primary" disabled={selected.size < 2} onClick={() => setView("compare")}>
+            <button
+              className="btn primary"
+              disabled={selected.size < 2}
+              onClick={() => setView("compare")}
+            >
               View comparison ({selected.size})
             </button>
           )}
         </div>
       </div>
 
-      <PipelineTabs pipeline={pipeline.data} active={tab} onChange={setTab} />
+      <PipelineTabs pipeline={tabCounts} active={tab} onChange={setTab} />
 
-      <InsightsPanel tab={tab} />
+      <InsightsPanel tab={tab} alphaRange={alphaRange} />
 
       <div className="cl-caprow">
         <p className="cl-cap">
-          <b>{tab === "scored" ? "Scored" : tab === "shortlisted" ? "Shortlisted" : "Selected for Interview"}</b> ·{" "}
-          {rows.length} candidate{rows.length === 1 ? "" : "s"}
+          <b>
+            {tab === "scored"
+              ? "Scored"
+              : tab === "shortlisted"
+                ? "Shortlisted"
+                : "Selected for Interview"}
+          </b>{" "}
+          · {rows.length} candidate{rows.length === 1 ? "" : "s"}
         </p>
-        <button type="button" className="btn btn-ico" title="Filter" aria-label="Filter" onClick={() => setFilterOpen(true)}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button
+          type="button"
+          className="btn btn-ico"
+          title="Filter"
+          aria-label="Filter"
+          onClick={() => setFilterOpen(true)}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
           </svg>
         </button>
       </div>
 
-      {filterActive && (
+      {(filterActive || prefsActive) && (
         <div className="flt-row">
+          {prefsActive && (
+            <span className="flt-pill">
+              <span>
+                Preferences : {Object.keys(prefValues ?? {}).length} criteria
+              </span>
+              <button
+                className="flt-x"
+                aria-label="Remove preferences filter"
+                onClick={() => setPrefValues(null)}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          )}
           {filter.currency && (
             <span className="flt-pill">
               <span>Currency : {filter.currency}</span>
-              <button className="flt-x" aria-label="Remove currency filter" onClick={() => setFilter((f) => ({ ...f, currency: null }))}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              <button
+                className="flt-x"
+                aria-label="Remove currency filter"
+                onClick={() => setFilter((f) => ({ ...f, currency: null }))}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
               </button>
             </span>
           )}
           {filter.region && (
             <span className="flt-pill">
               <span>Region : {filter.region}</span>
-              <button className="flt-x" aria-label="Remove region filter" onClick={() => setFilter((f) => ({ ...f, region: null }))}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              <button
+                className="flt-x"
+                aria-label="Remove region filter"
+                onClick={() => setFilter((f) => ({ ...f, region: null }))}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
               </button>
             </span>
           )}
           {filter.strategy.length > 0 && (
             <span className="flt-pill">
               <span>Strategy : {filter.strategy.join(", ")}</span>
-              <button className="flt-x" aria-label="Remove strategy filter" onClick={() => setFilter((f) => ({ ...f, strategy: [] }))}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              <button
+                className="flt-x"
+                aria-label="Remove strategy filter"
+                onClick={() => setFilter((f) => ({ ...f, strategy: [] }))}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
               </button>
             </span>
           )}
@@ -216,9 +551,18 @@ export function CandidatesPage() {
 
       {tab === "scored" && <AzFilterStrip active={az} onChange={setAz} />}
 
-      {(matrix.loading || pipeline.loading || candidates.loading) && <LoadingState label="Loading candidates…" />}
+      {(matrix.loading || pipeline.loading || candidates.loading) && (
+        <LoadingState label="Loading candidates…" />
+      )}
       {(matrix.error || pipeline.error || candidates.error) && (
-        <ErrorState message={matrix.error ?? pipeline.error ?? candidates.error ?? "Failed to load"} />
+        <ErrorState
+          message={
+            matrix.error ??
+            pipeline.error ??
+            candidates.error ??
+            "Failed to load"
+          }
+        />
       )}
 
       {!matrix.loading && !pipeline.loading && !candidates.loading && (
@@ -228,6 +572,7 @@ export function CandidatesPage() {
           compareMode={compareMode}
           selected={selected}
           onToggleSelect={toggleSelect}
+          onShortlist={shortlist}
           onAdvance={advance}
           onReject={reject}
         />
@@ -239,7 +584,13 @@ export function CandidatesPage() {
         title="Default preferences"
         description="Set target ranges to pre-filter and rank the scored pool. Applied to new sessions."
         metrics={PREFERENCE_METRICS}
-        notesPlaceholder={"e.g. Prioritise managers with consistent alpha across regimes.\nDown-weight funds with high turnover or crowded positioning."}
+        notesPlaceholder={
+          "e.g. Prioritise managers with consistent alpha across regimes.\nDown-weight funds with high turnover or crowded positioning."
+        }
+        onApply={(values) => {
+          if (values.alpha) setAlphaRange(values.alpha);
+          setPrefValues(values);
+        }}
       />
       <PreferenceDialog
         open={factorOpen}
@@ -247,7 +598,9 @@ export function CandidatesPage() {
         title="Factor preferences"
         description="Set factor screens used to pre-rank the scored pool, based on the five core investment factors. Applied to new sessions."
         metrics={FACTOR_METRICS}
-        notesPlaceholder={"e.g. Blend Value and Quality for core sleeves.\nCap the Momentum sleeve at 20% of book during high-vol regimes."}
+        notesPlaceholder={
+          "e.g. Blend Value and Quality for core sleeves.\nCap the Momentum sleeve at 20% of book during high-vol regimes."
+        }
       />
       <CandidateFilterDialog
         open={filterOpen}

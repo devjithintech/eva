@@ -6,6 +6,7 @@
  */
 import { RENDERERS } from "./renderers.js";
 import { RENDERER_SECTIONS } from "../data/candidates.js";
+import { PEERFIT_LABELS } from "../data/peerfit.js";
 
 /* ── shared bits ────────────────────────────────────────────────────────────*/
 const notFound = {
@@ -60,13 +61,15 @@ const CandidateRecord = {
 };
 const MatrixRow = {
   type: "object",
-  required: ["name", "cagr", "sharpe", "alpha", "dd"],
+  required: ["name", "cagr", "sharpe", "alpha", "dd", "infoRatio", "beta"],
   properties: {
     name: { type: "string", example: "Meson" },
     cagr: { type: "number", nullable: true, example: 21.6 },
     sharpe: { type: "number", nullable: true, example: 1.8 },
     alpha: { type: "number", nullable: true, example: 18.7 },
     dd: { type: "number", nullable: true, example: -11.3 },
+    infoRatio: { type: "number", nullable: true, example: 1.2 },
+    beta: { type: "number", nullable: true, example: 0.35 },
     you: { type: "boolean" },
   },
 };
@@ -85,7 +88,14 @@ const Renderer = {
 };
 const PeerGroup = {
   type: "object",
-  properties: { id: { type: "string" }, name: { type: "string" }, memberCount: { type: "integer" } },
+  properties: { name: { type: "string" }, count: { type: "integer" }, source: { type: "string" } },
+};
+const CandPeer = {
+  type: "object",
+  properties: {
+    key: { type: "string" }, short: { type: "string" }, fund: { type: "string" }, cand: { type: "string" },
+    ret: { type: "number" }, vol: { type: "number" }, dd: { type: "number" }, corr: { type: "number" },
+  },
 };
 const PeerSet = {
   type: "object",
@@ -153,12 +163,29 @@ const RiskFramework = F({ risk_framework_description: "s", drawdown_response_pro
 const BenchmarkActiveness = F({ scope: "s", fund_ref: "s", share_class: "s", period: "s", note: "s", beta: "n", up_capture_pct: "n", down_capture_pct: "n", market_correlation: "n", r_squared: "n" });
 const VolatilityGreeks = F({ scope: "s", fund_ref: "s", period: "s", note: "s", convexity_note: "s", is_short_volatility: "b", greeks: "o" });
 
-const PeerCorrelation = {
+/** The Peer Fit & Sim renderer envelope (D1-5/6/6b/7/7b/8/9/9b) — dynamic
+ *  `{schema, rows, attrs, identity}` shape per FRONTEND_API_GUIDE_v6.pdf.
+ *  Left loosely typed here per the guide's own spec caveat: "renderer
+ *  responses are dynamic {schema, rows, attrs} envelopes, so GET
+ *  /renderers/{label} is typed loosely (a generic object) in the OpenAPI
+ *  spec." The per-label row/attrs shapes in the guide remain the canonical
+ *  reference; see `server/src/data/peerfit.ts` for the actual builders. */
+const RendererEnvelope = {
   type: "object",
   properties: {
-    title: { type: "string" },
-    note: { type: "string" },
-    funds: { type: "array", items: { type: "object", properties: { name: { type: "string" }, benchmark: { type: "string" }, marketCorrelation: { type: "number", nullable: true }, rSquared: { type: "number", nullable: true }, beta: { type: "number", nullable: true }, highlight: { type: "boolean" } } } },
+    schema: { type: "array", items: { type: "object", properties: { name: { type: "string" }, type: { type: "string" } } } },
+    rows: { type: "array", items: { type: "object", additionalProperties: true } },
+    attrs: { type: "object", additionalProperties: true },
+    identity: {
+      type: "object",
+      properties: {
+        scope: { type: "string", enum: ["Candidate", "Fund", "Book"] },
+        fund_id: { type: "string", nullable: true },
+        fund_name: { type: "string", nullable: true },
+        candidate_id: { type: "string", nullable: true },
+        pm_id: { type: "string", nullable: true },
+      },
+    },
   },
 };
 
@@ -170,14 +197,30 @@ const SECTION_REF: Record<string, string> = {
   benchmark_activeness: "BenchmarkActiveness", volatility_greeks: "VolatilityGreeks",
 };
 
-/** The `data` schema for a renderer label (D1-8 = peer correlation; per-fund = fund + section refs). */
+/** The `data` schema for a non-Peer-Fit renderer label — fund + real-section
+ *  refs (or a loose object when the label has no known sections). */
 function rendererDataSchema(label: string): Record<string, unknown> {
-  if (label === "D1-8") return { $ref: "#/components/schemas/PeerCorrelation" };
   const secs = RENDERER_SECTIONS[label];
   if (!secs) return { type: "object", additionalProperties: true };
   const properties: Record<string, unknown> = { fund: { type: "string" } };
   for (const s of secs) properties[s] = { $ref: `#/components/schemas/${SECTION_REF[s]}` };
   return { type: "object", properties, additionalProperties: true };
+}
+
+/** The full response schema for a renderer label. Peer Fit & Sim labels
+ *  (D1-5/6/6b/7/7b/8/9/9b) return the guide's envelope directly; every other
+ *  label keeps the `{label, description, candidate, data}` wrapper. */
+function rendererResponseSchema(label: string): Record<string, unknown> {
+  if (PEERFIT_LABELS.has(label)) return { $ref: "#/components/schemas/RendererEnvelope" };
+  return {
+    type: "object",
+    properties: {
+      label: { type: "string" },
+      description: { type: "string" },
+      candidate: { type: "string", nullable: true },
+      data: rendererDataSchema(label),
+    },
+  };
 }
 
 /* ── generated renderer paths ───────────────────────────────────────────────*/
@@ -195,15 +238,7 @@ const rendererPaths = Object.fromEntries(
             description: r.description,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    label: { type: "string" },
-                    description: { type: "string" },
-                    candidate: { type: "string", nullable: true },
-                    data: rendererDataSchema(r.label),
-                  },
-                },
+                schema: rendererResponseSchema(r.label),
               },
             },
           },
@@ -243,6 +278,7 @@ export const openapi = {
 
     "/peer_groups": { get: { tags: ["Peer data"], summary: "Pre-built peer groups", operationId: "getPeerGroups", responses: { 200: { description: "Peer groups", content: jsonArray("#/components/schemas/PeerGroup") } } } },
     "/peer_names": { get: { tags: ["Peer data"], summary: "Peer names search", operationId: "getPeerNames", parameters: [{ name: "q", in: "query", required: false, schema: { type: "string" } }], responses: { 200: { description: "Matching peers" } } } },
+    "/peer_candidates": { get: { tags: ["Peer data"], summary: "Candidate-peer roster (valid candidate_peer_set members)", operationId: "getPeerCandidates", responses: { 200: { description: "Candidate peers", content: jsonArray("#/components/schemas/CandPeer") } } } },
     "/peer_sets": {
       get: { tags: ["Peer data"], summary: "List saved custom peer sets", operationId: "listPeerSets", responses: { 200: { description: "Peer sets", content: jsonArray("#/components/schemas/PeerSet") } } },
       post: { tags: ["Peer data"], summary: "Save a custom peer set", operationId: "createPeerSet", requestBody: { content: { "application/json": { schema: { type: "object", properties: { name: { type: "string" }, members: { type: "array", items: { type: "string" } } } } } } }, responses: { 200: { description: "Saved set", content: jsonObj("#/components/schemas/PeerSet") } } },
@@ -260,8 +296,8 @@ export const openapi = {
   },
   components: {
     schemas: {
-      CandidateSummary, CandidateRecord, MatrixRow, CandidateMatrix, OpportunityMap, PipelineState, Renderer, PeerGroup, PeerSet, Run, CatalogEntry, Error: ErrorSchema,
-      PeerCorrelation, SubjectFund, Classification, ReturnSkill, DownsideDistribution, Exposure, Factors, Holdings, Liquidity, RiskFramework, BenchmarkActiveness, VolatilityGreeks,
+      CandidateSummary, CandidateRecord, MatrixRow, CandidateMatrix, OpportunityMap, PipelineState, Renderer, PeerGroup, PeerSet, CandPeer, Run, CatalogEntry, Error: ErrorSchema,
+      RendererEnvelope, SubjectFund, Classification, ReturnSkill, DownsideDistribution, Exposure, Factors, Holdings, Liquidity, RiskFramework, BenchmarkActiveness, VolatilityGreeks,
     },
   },
 };

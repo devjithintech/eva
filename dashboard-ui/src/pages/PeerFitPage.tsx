@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCandidate } from "../api/hooks";
+import type { RunParams } from "../api/types";
 import { LoadingState } from "../components/common/LoadingState";
 import { ErrorState } from "../components/common/ErrorState";
 import { Breadcrumbs } from "../components/layout/Breadcrumbs";
@@ -56,6 +57,18 @@ export function PeerFitPage({ id }: Props) {
   const [peerGroup, setPeerGroup] = useState(DEFAULT_PEER_GROUP);
   const [peerUniverseOn, setPeerUniverseOn] = useState(true);
   const [selectedPeerKeys, setSelectedPeerKeys] = useState<Set<string>>(new Set());
+
+  const params: RunParams = useMemo(
+    () => ({
+      benchmark,
+      risk_free: riskFree,
+      window_start: `${win.from}-01`,
+      window_end: `${win.to}-01`,
+      ...(peerUniverseOn ? { peer_group: peerGroup } : { include_peer_universe: false }),
+      ...(selectedPeerKeys.size ? { candidate_peer_set: Array.from(selectedPeerKeys) } : {}),
+    }),
+    [benchmark, riskFree, win, peerUniverseOn, peerGroup, selectedPeerKeys],
+  );
 
   if (loading) return <div className="container"><LoadingState label="Loading candidate…" /></div>;
   if (error || !rec) return <div className="container"><ErrorState message={error ?? "Candidate not found"} /></div>;
@@ -184,9 +197,9 @@ export function PeerFitPage({ id }: Props) {
       <div className="mock-banner">
         <span>⚠️</span>
         <span>
-          This page uses a static mock reference dataset. The server's own data model has no pairwise peer
-          correlations or what-if simulator inputs yet — see <code>buildPeerCorrelation</code>'s comment in{" "}
-          <code>server/src/data/candidates.ts</code>.
+          Figures here are illustrative — <code>data.json</code> has no pairwise peer return series to correlate, so
+          this tab's panels are backed by a mock dataset server-side (see <code>server/src/data/peerfit.ts</code>),
+          served through the same <code>/api/renderers/:label</code> contract as the rest of the dossier.
         </span>
       </div>
 
@@ -204,13 +217,13 @@ export function PeerFitPage({ id }: Props) {
       </div>
 
       {tab === "snapshot" && (
-        <SnapshotView candidateName={rec.name} selectedPeerKeys={selectedPeerKeys} onAddPeers={() => openConfig("candidates")} />
+        <SnapshotView id={id} candidateName={rec.name} params={params} selectedPeerKeys={selectedPeerKeys} onAddPeers={() => openConfig("candidates")} />
       )}
-      {tab === "peers" && <PeerTableView candidateName={rec.name} onOpenCandidates={() => openConfig("candidates")} />}
-      {tab === "correlations" && <CorrelationsView candidateName={rec.name} />}
-      {tab === "matrix" && <MatrixView candidateName={rec.name} />}
+      {tab === "peers" && <PeerTableView id={id} candidateName={rec.name} params={params} onOpenCandidates={() => openConfig("candidates")} />}
+      {tab === "correlations" && <CorrelationsView id={id} candidateName={rec.name} params={params} />}
+      {tab === "matrix" && <MatrixView id={id} candidateName={rec.name} params={params} />}
       {tab === "simulator" && (
-        <SimulatorView candidateName={rec.name} selectedPeerKeys={selectedPeerKeys} onOpenPoolDetail={() => setOpenModal("pool")} />
+        <SimulatorView id={id} candidateName={rec.name} params={params} selectedPeerKeys={selectedPeerKeys} onOpenPoolDetail={() => setOpenModal("pool")} />
       )}
 
       <p className="pf-footnote">
@@ -235,7 +248,7 @@ export function PeerFitPage({ id }: Props) {
         }}
       />
       <WindowModal open={openModal === "window"} onClose={() => setOpenModal(null)} value={win} onApply={setWin} />
-      <PoolDetailModal open={openModal === "pool"} onClose={() => setOpenModal(null)} />
+      <PoolDetailModal open={openModal === "pool"} onClose={() => setOpenModal(null)} id={id} params={params} />
     </div>
   );
 }

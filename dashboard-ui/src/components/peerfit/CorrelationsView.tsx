@@ -1,24 +1,34 @@
-import { useMemo } from "react";
-import { PEER_FUNDS, buildCorrelationMatrix, heatClass } from "./fixtures";
+import { useRenderer } from "../../api/hooks";
+import type { RunParams } from "../../api/types";
+import { LoadingState } from "../common/LoadingState";
+import { ErrorState } from "../common/ErrorState";
+import { heatClass } from "./heat";
 
-interface Props {
-  candidateName: string;
+interface CorrRow {
+  quadrant: "lh_most" | "lh_least" | "bb_most" | "bb_least";
+  name: string;
+  correlation: number;
+  source: string;
 }
 
-export function CorrelationsView({ candidateName }: Props) {
-  const names = useMemo(() => [candidateName, ...PEER_FUNDS], [candidateName]);
-  const matrix = useMemo(() => buildCorrelationMatrix(names), [names]);
-  const subjectRow = matrix[0];
+interface Props {
+  id: string;
+  candidateName: string;
+  params: RunParams;
+}
 
-  const ranked = names
-    .map((name, i) => ({ name, corr: subjectRow[i] }))
-    .filter((_, i) => i !== 0)
-    .sort((a, b) => b.corr - a.corr);
+export function CorrelationsView({ id, params }: Props) {
+  const corr = useRenderer<CorrRow>("D1-7", id, params);
 
-  const topCorrelated = ranked.slice(0, 8);
-  const leastCorrelated = [...ranked].sort((a, b) => a.corr - b.corr).slice(0, 8);
+  if (corr.loading) return <LoadingState label="Loading correlations…" />;
+  if (corr.error || !corr.data) return <ErrorState message={corr.error ?? "Correlations unavailable"} />;
 
-  const list = (title: string, sub: string, rows: { name: string; corr: number }[]) => (
+  const rows = corr.data.rows;
+  const topCorrelated = rows.filter((r) => r.quadrant === "lh_most" || r.quadrant === "bb_most");
+  const leastCorrelated = rows.filter((r) => r.quadrant === "lh_least" || r.quadrant === "bb_least");
+  const scanned = (corr.data.attrs?.scanned as number) ?? rows.length;
+
+  const list = (title: string, sub: string, entries: CorrRow[]) => (
     <div className="corr-box">
       <div className="corr-head">
         <span className="corr-title">{title}</span>
@@ -32,11 +42,14 @@ export function CorrelationsView({ candidateName }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {entries.map((r) => (
             <tr key={r.name}>
               <td>{r.name}</td>
               <td className="cv">
-                <span className={`hc ${heatClass(r.corr)}`}>{r.corr >= 0 ? "+" : ""}{r.corr.toFixed(2)}</span>
+                <span className={`hc ${heatClass(r.correlation)}`}>
+                  {r.correlation >= 0 ? "+" : ""}
+                  {r.correlation.toFixed(2)}
+                </span>
               </td>
             </tr>
           ))}
@@ -51,7 +64,7 @@ export function CorrelationsView({ candidateName }: Props) {
         <span>Correlations — mock reference set</span>
       </div>
       <div className="corr-grid">
-        {list("Top correlated", `${PEER_FUNDS.length} funds scanned`, topCorrelated)}
+        {list("Top correlated", `${scanned} funds scanned`, topCorrelated)}
         {list("Least correlated (diversifiers)", "Negative-corr opportunities", leastCorrelated)}
       </div>
     </div>

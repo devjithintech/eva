@@ -46,6 +46,8 @@ export interface MatrixRow {
   sharpe: number | null;
   alpha: number | null;
   dd: number | null;
+  infoRatio: number | null;
+  beta: number | null;
   you?: boolean;
 }
 export interface CandidatePoolPayload {
@@ -128,6 +130,7 @@ export interface OppPoint {
   name: string;
   cagr: number;
   dd: number;
+  alpha: number | null;
   stage: "scored" | "shortlisted" | "interview";
 }
 

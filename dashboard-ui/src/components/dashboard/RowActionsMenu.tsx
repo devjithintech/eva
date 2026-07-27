@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
+  showShortlist: boolean;
   showInterview: boolean;
+  onShortlist: () => void;
   onSelectInterview: () => void;
   onShare: () => void;
   onAddNote: () => void;
   onReject: () => void;
 }
 
-/** Per-row "⋮" actions menu — matches the design reference's kebab menu
- *  exactly: Select for interview / Share this profile / Add a note /
- *  Reject Candidate, each opening its own dialog (wired by the caller). */
-export function RowActionsMenu({ showInterview, onSelectInterview, onShare, onAddNote, onReject }: Props) {
+/** Per-row "⋮" actions menu — the design reference's own kebab menu (Select
+ *  for interview / Share this profile / Add a note / Reject Candidate) has
+ *  no way to move a candidate into the intermediate "shortlisted" stage —
+ *  only straight to "interview" — so the real 3-stage pipeline
+ *  (scored → shortlisted → interview) could never actually populate its
+ *  Shortlisted tab. "Add to shortlist" fills that gap; the rest match the
+ *  reference exactly. */
+export function RowActionsMenu({ showShortlist, showInterview, onShortlist, onSelectInterview, onShare, onAddNote, onReject }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -59,6 +65,17 @@ export function RowActionsMenu({ showInterview, onSelectInterview, onShare, onAd
       </button>
       {open && pos && (
         <div className="kb-menu" ref={menuRef} role="menu" style={{ top: pos.top, left: pos.left }}>
+          {showShortlist && (
+            <>
+              <button type="button" role="menuitem" className="kb-item" onClick={runAndClose(onShortlist)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                Add to shortlist
+              </button>
+              <hr className="kb-sep" />
+            </>
+          )}
           {showInterview && (
             <>
               <button type="button" role="menuitem" className="kb-item" onClick={runAndClose(onSelectInterview)}>
