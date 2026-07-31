@@ -125,15 +125,23 @@ export const useOpportunityMap = () => useResource<OpportunityMapData>("/opportu
 
 /** Generic D1-x renderer call (`GET /renderers/{label}`) — used by the Peer
  *  Fit & Sim panels. `params` is URL-encoded as the `params` JSON query
- *  string per the Frontend API Guide's `RunParams` contract. Pass a null
+ *  string per the Frontend API Guide's `RunParams` contract. `extra` covers
+ *  the renderer's own plain query params (`axis`, `kind`, `stress_model`, …)
+ *  for labels with multiple variants (e.g. D1-10?axis=sector). Pass a null
  *  `fundId` to skip. */
 export function useRenderer<TRow = Record<string, unknown>>(
   label: string,
   fundId: string | null,
   params?: RunParams,
+  extra?: Record<string, string>,
 ): Resource<RendererEnvelope<TRow>> {
   const query = params && Object.keys(params).length ? `&params=${encodeURIComponent(JSON.stringify(params))}` : "";
-  const path = fundId == null ? null : `/renderers/${label}?candidate_id=${encodeURIComponent(fundId)}${query}`;
+  const extraQuery = extra
+    ? Object.entries(extra)
+        .map(([k, v]) => `&${k}=${encodeURIComponent(v)}`)
+        .join("")
+    : "";
+  const path = fundId == null ? null : `/renderers/${label}?candidate_id=${encodeURIComponent(fundId)}${query}${extraQuery}`;
   return useResource<RendererEnvelope<TRow>>(path);
 }
 

@@ -6,7 +6,6 @@ import {
   useSetStage,
 } from "../api/hooks";
 import type { CandidateSummary, Stage } from "../api/types";
-import { computeScores } from "../lib/score";
 import { matchesPreferences } from "../lib/preferences";
 import { Breadcrumbs } from "../components/layout/Breadcrumbs";
 import {
@@ -173,7 +172,7 @@ export function CandidatesPage() {
   const pipeline = usePipeline();
   const { setStage } = useSetStage();
 
-  const [tab, setTab] = useState<DashboardTab>("scored");
+  const [tab, setTab] = useState<DashboardTab>("analyzed");
   const [az, setAz] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -204,14 +203,6 @@ export function CandidatesPage() {
     return m;
   }, [candidates.data]);
 
-  const scores = useMemo(
-    () =>
-      matrix.data
-        ? computeScores(matrix.data.rows)
-        : new Map<string, number | null>(),
-    [matrix.data],
-  );
-
   const filterActive =
     filter.currency != null ||
     filter.region != null ||
@@ -219,24 +210,24 @@ export function CandidatesPage() {
   const prefsActive = prefValues != null;
 
   /** Tab badge counts — mirrors the membership rules in `rows` below (stage
-   *  for Scored/Interview, matchesPreferences for Shortlisted) so the number
+   *  for Analyzed/Interview, matchesPreferences for Shortlisted) so the number
    *  on each tab always matches what clicking into it actually shows. */
   const tabCounts = useMemo(() => {
     if (!matrix.data || !pipeline.data) return null;
     const effective = prefValues ?? DEFAULT_PREF_VALUES;
-    let scored = 0;
+    let analyzed = 0;
     let shortlisted = 0;
     let interview = 0;
     for (const r of matrix.data.rows) {
       const id = nameToId.get(r.name);
       if (!id) continue;
-      const stage: Stage = pipeline.data.stages[id] ?? "scored";
+      const stage: Stage = pipeline.data.stages[id] ?? "analyzed";
       if (stage === "rejected") continue;
-      scored++;
+      analyzed++;
       if (matchesPreferences(r, effective)) shortlisted++;
       if (stage === "interview") interview++;
     }
-    return { scored, shortlisted, interview, stages: pipeline.data.stages };
+    return { analyzed, shortlisted, interview, stages: pipeline.data.stages };
   }, [matrix.data, pipeline.data, nameToId, prefValues]);
 
   const rows: TableRow[] = useMemo(() => {
@@ -245,13 +236,19 @@ export function CandidatesPage() {
       .map((r) => {
         const id = nameToId.get(r.name);
         if (!id) return null;
-        const stage: Stage = pipeline.data!.stages[id] ?? "scored";
-        return { ...r, id, stage, flagCount: flagCountByName.get(r.name) ?? 0 };
+        const stage: Stage = pipeline.data!.stages[id] ?? "analyzed";
+        return {
+          ...r,
+          id,
+          stage,
+          flagCount: flagCountByName.get(r.name) ?? 0,
+          fundName: summaryByName.get(r.name)?.fundName ?? null,
+        };
       })
       .filter((r): r is TableRow => r !== null)
       .filter((r) => (az ? r.name.trim().toUpperCase().startsWith(az) : true))
       .filter((r) => {
-        if (tab === "scored") return r.stage !== "rejected";
+        if (tab === "analyzed") return r.stage !== "rejected";
         if (tab === "shortlisted")
           return (
             r.stage !== "rejected" &&
@@ -424,8 +421,8 @@ export function CandidatesPage() {
       <div className="cl-caprow">
         <p className="cl-cap">
           <b>
-            {tab === "scored"
-              ? "Scored"
+            {tab === "analyzed"
+              ? "Analyzed"
               : tab === "shortlisted"
                 ? "Shortlisted"
                 : "Selected for Interview"}
@@ -549,7 +546,7 @@ export function CandidatesPage() {
         </div>
       )}
 
-      {tab === "scored" && <AzFilterStrip active={az} onChange={setAz} />}
+      {tab === "analyzed" && <AzFilterStrip active={az} onChange={setAz} />}
 
       {(matrix.loading || pipeline.loading || candidates.loading) && (
         <LoadingState label="Loading candidates…" />
@@ -568,7 +565,6 @@ export function CandidatesPage() {
       {!matrix.loading && !pipeline.loading && !candidates.loading && (
         <CandidateTable
           rows={rows}
-          scores={scores}
           compareMode={compareMode}
           selected={selected}
           onToggleSelect={toggleSelect}
@@ -582,7 +578,7 @@ export function CandidatesPage() {
         open={prefOpen}
         onClose={() => setPrefOpen(false)}
         title="Default preferences"
-        description="Set target ranges to pre-filter and rank the scored pool. Applied to new sessions."
+        description="Set target ranges to pre-filter and rank the analyzed pool. Applied to new sessions."
         metrics={PREFERENCE_METRICS}
         notesPlaceholder={
           "e.g. Prioritise managers with consistent alpha across regimes.\nDown-weight funds with high turnover or crowded positioning."
@@ -596,7 +592,7 @@ export function CandidatesPage() {
         open={factorOpen}
         onClose={() => setFactorOpen(false)}
         title="Factor preferences"
-        description="Set factor screens used to pre-rank the scored pool, based on the five core investment factors. Applied to new sessions."
+        description="Set factor screens used to pre-rank the analyzed pool, based on the five core investment factors. Applied to new sessions."
         metrics={FACTOR_METRICS}
         notesPlaceholder={
           "e.g. Blend Value and Quality for core sleeves.\nCap the Momentum sleeve at 20% of book during high-vol regimes."

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useRenderer } from "../../api/hooks";
+import { useEffect, useMemo, useState } from "react";
+import { useCandidatePeers, useRenderer } from "../../api/hooks";
 import type { RunParams } from "../../api/types";
 import { LoadingState } from "../common/LoadingState";
 import { ErrorState } from "../common/ErrorState";
@@ -18,6 +18,8 @@ interface CohortRow {
   fund_id: string;
   is_subject: boolean;
   short: string;
+  fund_name: string;
+  candidate_id: string;
   ret: number;
   vol: number;
   sharpe: number;
@@ -32,6 +34,12 @@ interface CohortRow {
   max_pm_corr: number;
   fit_zone: "diversifying" | "approaching" | "penalty";
 }
+
+const ZONE_CHIP: Record<CohortRow["fit_zone"], string> = {
+  diversifying: "chip-div",
+  approaching: "chip-app",
+  penalty: "chip-pen",
+};
 
 interface PoolMember {
   name: string;
@@ -56,10 +64,31 @@ const PRESETS: { label: string; alloc: number }[] = [
 
 const POOL_COLORS = ["#9facd9", "#dc8e88", "#e4bd81", "#c2cd9c", "#90abb2", "#b7a1cc", "#d0c48a", "#8fbfae"];
 
-export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }: Props) {
+export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onOpenPoolDetail }: Props) {
   const [alloc, setAlloc] = useState(5);
+  const [simInclude, setSimInclude] = useState<Set<string>>(new Set(selectedPeerKeys));
 
-  const simParams = useMemo<RunParams>(() => ({ ...params, allocation_pct: alloc / 100 }), [params, alloc]);
+  const candidatePeers = useCandidatePeers();
+  const availablePeers = (candidatePeers.data ?? []).filter((c) => selectedPeerKeys.has(c.key));
+
+  const peerKeysSig = Array.from(selectedPeerKeys).sort().join(",");
+  useEffect(() => {
+    setSimInclude(new Set(selectedPeerKeys));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peerKeysSig]);
+
+  const toggleInclude = (key: string) =>
+    setSimInclude((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const simParams = useMemo<RunParams>(
+    () => ({ ...params, allocation_pct: alloc / 100, candidate_peer_set: Array.from(simInclude) }),
+    [params, alloc, simInclude],
+  );
   const pool = useRenderer<SimRow>("D1-9", id, simParams);
   const cohort = useRenderer<CohortRow>("D1-9b", id, simParams);
 
@@ -71,9 +100,16 @@ export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }
   const attrs = pool.data.attrs ?? {};
   const poolMembers = (attrs.pool_members as PoolMember[]) ?? [];
   const totalWeight = (attrs.pool_total_weight as number) ?? poolMembers.reduce((a, m) => a + m.weight, 0);
+  const grossExposure = (attrs.gross_exposure_pct as number) ?? 124;
+  const netExposure = (attrs.net_exposure_pct as number) ?? 38;
+  const kellyMultiplier = (attrs.kelly_multiplier_pct as number) ?? 25;
+  const stressRegime = (attrs.stress_regime as string) ?? "Normal";
 
   const results = cohort.data.rows;
   const best = results[0];
+  const subjectShort = results.find((x) => x.is_subject)?.short ?? candidateName;
+  const penalizedCount = results.filter((x) => x.fit_zone === "penalty").length;
+  const calloutClass = best.fit_zone === "penalty" ? " bad" : penalizedCount > 0 ? " warn" : "";
 
   const d = (v: number, digits = 2, invertGood = false) => {
     const good = invertGood ? v <= 0 : v >= 0;
@@ -86,13 +122,7 @@ export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }
 
   return (
     <div className="pl-view">
-      <div className="pl-sh">
-        <span>What-if simulator — mock reference pool</span>
-      </div>
       <div className="sim-shell">
-        <div className="sim-head">
-          <span className="sim-title">Simulator · Lighthouse Diversified + {results.length} candidate{results.length === 1 ? "" : "s"}</span>
-        </div>
         <div className="sim-body">
           <div className="sim-controls">
             <div className="sim-presets">
@@ -120,25 +150,92 @@ export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }
                 className="sim-slider"
                 onChange={(e) => setAlloc(Number(e.target.value))}
               />
+              <div className="sim-range">
+                <span>0%</span>
+                <span>15%</span>
+              </div>
+            </div>
+            <div className="sim-ctrl disabled">
+              <div className="sim-ctrl-top">
+                <span className="sim-ctrl-lbl">Gross exposure</span>
+                <span className="sim-ctrl-val">{grossExposure}%</span>
+              </div>
+              <input type="range" min={80} max={200} step={2} value={grossExposure} disabled className="sim-slider" readOnly />
+              <div className="sim-range">
+                <span>80%</span>
+                <span>200%</span>
+              </div>
+            </div>
+            <div className="sim-ctrl disabled">
+              <div className="sim-ctrl-top">
+                <span className="sim-ctrl-lbl">Net exposure</span>
+                <span className="sim-ctrl-val">{netExposure}%</span>
+              </div>
+              <input type="range" min={0} max={80} step={2} value={netExposure} disabled className="sim-slider" readOnly />
+              <div className="sim-range">
+                <span>0%</span>
+                <span>80%</span>
+              </div>
+            </div>
+            <div className="sim-ctrl disabled">
+              <div className="sim-ctrl-top">
+                <span className="sim-ctrl-lbl">Kelly multiplier</span>
+                <span className="sim-ctrl-val">{kellyMultiplier}%</span>
+              </div>
+              <input type="range" min={10} max={60} step={1} value={kellyMultiplier} disabled className="sim-slider" readOnly />
+              <div className="sim-range">
+                <span>10%</span>
+                <span>60%</span>
+              </div>
+            </div>
+            <div className="sim-ctrl disabled">
+              <div className="sim-ctrl-top">
+                <span className="sim-ctrl-lbl">Stress regime</span>
+                <span className="sim-ctrl-val">{stressRegime}</span>
+              </div>
+              <input type="range" min={0} max={3} step={1} value={0} disabled className="sim-slider" readOnly />
+              <div className="sim-range">
+                <span>Normal</span>
+                <span>2008-style</span>
+              </div>
             </div>
             <p className="note" style={{ marginTop: 8 }}>
-              Identical criteria are applied to every candidate, into the same mock target pool — the marginal-impact
-              columns are directly comparable.
+              Identical criteria are applied to every selected candidate, into the same target pool — so the
+              marginal-impact columns are directly comparable.
             </p>
-            {selectedPeerKeys.size === 0 && (
-              <p className="note" style={{ marginTop: 8 }}>
-                No candidate peers selected — showing the subject only.
-              </p>
-            )}
           </div>
           <div className="sim-results">
+            <div className="sim-inc-chips">
+              <span className="ccl">Include &amp; simulate</span>
+              <span className="sim-inc-chip on subj">
+                <span className="ck" />
+                {subjectShort}
+              </span>
+              {availablePeers.map((c) => {
+                const on = simInclude.has(c.key);
+                return (
+                  <span
+                    key={c.key}
+                    className={`sim-inc-chip${on ? " on" : ""}`}
+                    onClick={() => toggleInclude(c.key)}
+                  >
+                    <span className="ck" />
+                    {c.short}
+                  </span>
+                );
+              })}
+              {availablePeers.length === 0 && (
+                <span className="note">Turn on candidate peers (config strip above) to compare more than one at once.</span>
+              )}
+            </div>
             <div className="pool-card">
               <div className="pool-head">
                 <span>
                   Current pool —{" "}
                   <button type="button" className="pool-info-btn" onClick={onOpenPoolDetail} title="What is the current pool?">
-                    <span className="ig">i</span>LH Diversified · {poolMembers.length} PMs
-                  </button>
+                    <span className="ig">i</span>LH Diversified Fund · {poolMembers.length} PMs
+                  </button>{" "}
+                  <span className="pool-sub">(baseline · candidate-independent)</span>
                 </span>
                 <span style={{ color: "var(--muted)" }}>100%</span>
               </div>
@@ -177,6 +274,24 @@ export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }
                   </tr>
                 </thead>
                 <tbody>
+                  <tr>
+                    <td>Fund</td>
+                    <td>—</td>
+                    {results.map((x) => (
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.fund_name}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td>Candidate id</td>
+                    <td>—</td>
+                    {results.map((x) => (
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {x.candidate_id}
+                      </td>
+                    ))}
+                  </tr>
                   <tr>
                     <td>Ann. return</td>
                     <td>+{(byMetric.get("annualised_return")?.current ?? 0).toFixed(1)}%</td>
@@ -236,7 +351,7 @@ export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }
                     <td>—</td>
                     {results.map((x) => (
                       <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.fit_zone.toUpperCase()}
+                        <span className={`vz ${ZONE_CHIP[x.fit_zone]}`}>{x.fit_zone.toUpperCase()}</span>
                       </td>
                     ))}
                   </tr>
@@ -244,11 +359,24 @@ export function SimulatorView({ id, params, selectedPeerKeys, onOpenPoolDetail }
               </table>
             </div>
 
-            <div className={`sim-callout${best.fit_zone === "penalty" ? " bad" : ""}`}>
-              <strong>Best fit — {best.short}</strong> at {alloc.toFixed(1)}% into Lighthouse Diversified: ENS Δ{" "}
-              {best.dENS >= 0 ? "+" : ""}
-              {best.dENS.toFixed(2)}, Sharpe Δ {best.dSharpe >= 0 ? "+" : ""}
-              {best.dSharpe.toFixed(2)}, max pool corr {best.max_pm_corr.toFixed(2)}.
+            <div className={`sim-callout${calloutClass}`}>
+              {best.fit_zone === "penalty" ? (
+                <>
+                  <strong>
+                    All {results.length} candidate{results.length === 1 ? "" : "s"} penalised at {alloc.toFixed(1)}% under {stressRegime}.
+                  </strong>{" "}
+                  Every max-pool correlation sits at/above the 0.60 threshold — reduce allocation or test an alternative pool.
+                </>
+              ) : (
+                <>
+                  <strong>Best fit — {best.short}</strong> at {alloc.toFixed(1)}% into Lighthouse Diversified: ENS Δ{" "}
+                  {best.dENS >= 0 ? "+" : ""}
+                  {best.dENS.toFixed(2)}, Sharpe Δ {best.dSharpe >= 0 ? "+" : ""}
+                  {best.dSharpe.toFixed(2)}, max pool corr {best.max_pm_corr.toFixed(2)}. {results.length} candidate
+                  {results.length === 1 ? "" : "s"} simulated under identical levers
+                  {penalizedCount > 0 ? ` · ${penalizedCount} hit the 0.60 penalty` : ""}.
+                </>
+              )}
             </div>
           </div>
         </div>

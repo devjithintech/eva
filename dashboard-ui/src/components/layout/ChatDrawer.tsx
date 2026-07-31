@@ -11,6 +11,20 @@ interface ChatMessage {
   typing?: boolean;
 }
 
+type View = "home" | "convo" | "history";
+type ConvoSource = "home" | "history";
+
+interface HistoryItem {
+  icon: "doc" | "folder" | "bookmark";
+  label: string;
+  question: string;
+  saved?: boolean;
+}
+interface HistoryGroup {
+  title: string;
+  items: HistoryItem[];
+}
+
 const QUICK_QUESTIONS: { icon: "list" | "msg"; label: string }[] = [
   { icon: "list", label: "Summarize" },
   { icon: "msg", label: "What is the very first step I should take today?" },
@@ -36,19 +50,35 @@ const FOLLOW_UPS: [string, string][] = [
   ["Action", "What is the very first step I should take today?"],
 ];
 
+const INITIAL_HISTORY: HistoryGroup[] = [
+  { title: "Today", items: [{ icon: "doc", label: "How's the pool looking today?", question: "How's the candidate pool looking today?" }] },
+  {
+    title: "Yesterday",
+    items: [{ icon: "doc", label: "What is the very first step I should take today?", question: "What is the very first step I should take today?" }],
+  },
+  {
+    title: "Saved",
+    items: [
+      { icon: "bookmark", label: "Opportunity map", question: "Opportunity map", saved: true },
+      { icon: "bookmark", label: "Candidate summary", question: "Candidate summary", saved: true },
+      { icon: "bookmark", label: "Side-by-side comparison", question: "Side-by-side comparison", saved: true },
+    ],
+  },
+];
+
 function answerFor(q: string): string {
   const k = q.toLowerCase();
   if (k.includes("summar")) {
-    return "The CIA dashboard tracks 57 scored candidate funds moving through Scored → Shortlisted → Interview. Use the filters and factor preferences to narrow the pool, then compare finalists before advancing them.";
+    return "The CIA dashboard tracks 57 analyzed candidate funds moving through Analyzed → Shortlisted → Interview. Use the filters and factor preferences to narrow the pool, then compare finalists before advancing them.";
   }
   if (k.includes("first step")) {
-    return "Start on the Scored tab: sort by Jensen's Alpha, apply any Currency/Region/Strategy filters you care about, and shortlist the candidates that clear your bar.";
+    return "Start on the Analyzed tab: sort by Jensen's Alpha, apply any Currency/Region/Strategy filters you care about, and shortlist the candidates that clear your bar.";
   }
   if (k.includes("simpler") || k.includes("dashboard")) {
-    return "Each row is one candidate fund. The tabs move funds through your pipeline — Scored, then Shortlisted, then Interview — and Insights above the table shows how the pool breaks down at each stage.";
+    return "Each row is one candidate fund. The tabs move funds through your pipeline — Analyzed, then Shortlisted, then Interview — and Insights above the table shows how the pool breaks down at each stage.";
   }
   if (k.includes("takeaway")) {
-    return "The single most important takeaway: use the Selection Zone chart on the Scored tab to spot strong candidates that haven't been shortlisted yet — that's usually where the best next moves are.";
+    return "The single most important takeaway: use the Selection Zone chart on the Analyzed tab to spot strong candidates that haven't been shortlisted yet — that's usually where the best next moves are.";
   }
   return "Here's what I found based on the current dashboard view. (Illustrative response.)";
 }
@@ -61,6 +91,49 @@ const MIC_ICON = (
     <line x1="8" y1="23" x2="16" y2="23" />
   </svg>
 );
+
+const HISTORY_ICON = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+);
+const BACK_ICON = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+const DOC_ICON = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+  </svg>
+);
+const FOLDER_ICON = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+);
+const BOOKMARK_ICON = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+  </svg>
+);
+const KEBAB_ICON = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="5" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="12" cy="19" r="1" />
+  </svg>
+);
+const TRASH_ICON = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+const HIST_ICONS: Record<HistoryItem["icon"], JSX.Element> = { doc: DOC_ICON, folder: FOLDER_ICON, bookmark: BOOKMARK_ICON };
 
 function ListIcon() {
   return (
@@ -82,17 +155,24 @@ function MsgIcon() {
   );
 }
 
-/** Decorative "LightAssist" chat drawer — ported from the design reference.
- *  Canned quick-answers only; not wired to a real backend (real chat lives in
- *  the separate conversation-ui app). */
+/** "LightAssist" chat drawer — ported from the design reference. Canned
+ *  quick-answers only; not wired to a real backend (real chat lives in the
+ *  separate conversation-ui app). Includes the reference's History list
+ *  (grouped past conversations + inert Saved items) but not its per-item
+ *  Rename affordance — delete only, per product decision. */
 export function ChatDrawer({ open, onClose }: Props) {
-  const [view, setView] = useState<"home" | "convo">("home");
+  const [view, setView] = useState<View>("home");
+  const [convoSource, setConvoSource] = useState<ConvoSource>("home");
+  const [convoTitle, setConvoTitle] = useState("Conversation");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [followUps, setFollowUps] = useState<string[][]>([]);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
+  const [history, setHistory] = useState<HistoryGroup[]>(INITIAL_HISTORY);
+  const [kebab, setKebab] = useState<{ gi: number; ii: number; top: number; left: number } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const kebabMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.body.classList.toggle("chat-open", open);
@@ -106,7 +186,25 @@ export function ChatDrawer({ open, onClose }: Props) {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [messages, view]);
 
-  const ask = (q: string) => {
+  useEffect(() => {
+    if (!kebab) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!kebabMenuRef.current?.contains(e.target as Node)) setKebab(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setKebab(null);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [kebab]);
+
+  const ask = (q: string, source: ConvoSource = "home") => {
+    setConvoSource(source);
+    setConvoTitle(q);
     setView("convo");
     setFollowUps([]);
     setMessages((prev) => [...prev, { role: "user", text: q }, { role: "bot", text: "", typing: true }]);
@@ -132,6 +230,7 @@ export function ChatDrawer({ open, onClose }: Props) {
   };
 
   const listen = () => {
+    setConvoSource("home");
     setView("convo");
     setMessages([]);
     setFollowUps([]);
@@ -146,6 +245,14 @@ export function ChatDrawer({ open, onClose }: Props) {
     setView("home");
     setMessages([]);
     setFollowUps([]);
+  };
+
+  const goBack = () => {
+    if (view === "convo" && convoSource === "history") {
+      setView("history");
+    } else {
+      backHome();
+    }
   };
 
   const autoGrow = () => {
@@ -171,18 +278,47 @@ export function ChatDrawer({ open, onClose }: Props) {
     });
   };
 
+  const openKebab = (gi: number, ii: number, btn: HTMLButtonElement) => {
+    const r = btn.getBoundingClientRect();
+    setKebab({ gi, ii, top: r.bottom + 4, left: Math.min(r.right - 190, window.innerWidth - 198) });
+  };
+
+  const deleteHistoryItem = () => {
+    if (!kebab) return;
+    setHistory((prev) =>
+      prev
+        .map((g, gi) => (gi === kebab.gi ? { ...g, items: g.items.filter((_, ii) => ii !== kebab.ii) } : g))
+        .filter((g) => g.items.length > 0),
+    );
+    setKebab(null);
+  };
+
+  const title = view === "home" ? "Eva Conversations" : view === "history" ? "History" : convoTitle;
+
   return (
-    <aside className="chat" aria-label="LightAssist" aria-hidden={!open}>
+    <aside className={`chat${view === "history" ? " hist-mode" : ""}`} aria-label="LightAssist" aria-hidden={!open}>
       <div className="chat-head">
-        <button className="chat-close" aria-label="Close" onClick={onClose}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        {view === "home" ? (
+          <button className="ch-ico" aria-label="History" onClick={() => setView("history")}>
+            {HISTORY_ICON}
+          </button>
+        ) : (
+          <button className="ch-ico" aria-label="Back" onClick={goBack}>
+            {BACK_ICON}
+          </button>
+        )}
+        <span className="ch-title">{title}</span>
+        <span className="ch-actions">
+          <button className="chat-close" aria-label="Close" onClick={onClose}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </span>
       </div>
       <div className="chat-body" ref={bodyRef}>
-        {view === "home" ? (
+        {view === "home" && (
           <div id="chatHome">
             <h2 className="chat-greet">
               Hi Morgan 👋
@@ -198,11 +334,41 @@ export function ChatDrawer({ open, onClose }: Props) {
               ))}
             </div>
           </div>
-        ) : (
+        )}
+        {view === "history" && (
+          <div className="chat-hist">
+            {history.map((group, gi) => (
+              <div key={group.title}>
+                <div className="hist-group">{group.title}</div>
+                {group.items.map((item, ii) =>
+                  item.saved ? (
+                    <div className="hist-item saved" key={ii}>
+                      <span className="hi-ic">{HIST_ICONS[item.icon]}</span>
+                      <span className="hi-t">{item.label}</span>
+                    </div>
+                  ) : (
+                    <div className="hist-item" key={ii} onClick={() => ask(item.question, "history")}>
+                      <span className="hi-ic">{HIST_ICONS[item.icon]}</span>
+                      <span className="hi-t">{item.label}</span>
+                      <button
+                        className="hist-kebab"
+                        aria-label="More"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openKebab(gi, ii, e.currentTarget);
+                        }}
+                      >
+                        {KEBAB_ICON}
+                      </button>
+                    </div>
+                  ),
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {view === "convo" && (
           <div id="chatConvo" className="chat-convo">
-            <button className="convo-back" onClick={backHome}>
-              ← New question
-            </button>
             <div id="convoMsgs">
               {messages.map((m, i) =>
                 m.typing ? (
@@ -281,6 +447,14 @@ export function ChatDrawer({ open, onClose }: Props) {
         </div>
         <div className="chat-disclaimer">AI can make mistakes. Check important info.</div>
       </div>
+      {kebab && (
+        <div className="kb-menu" ref={kebabMenuRef} role="menu" style={{ top: kebab.top, left: kebab.left }}>
+          <button type="button" role="menuitem" className="kb-item danger" onClick={deleteHistoryItem}>
+            {TRASH_ICON}
+            Delete
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

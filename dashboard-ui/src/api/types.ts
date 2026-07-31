@@ -26,7 +26,11 @@ export interface CandidateRecord {
   id: string;
   name: string;
   pm_id?: string;
-  subject_fund?: { fund_name?: string; sibling_funds?: unknown[]; [key: string]: unknown };
+  subject_fund?: {
+    fund_name?: string;
+    sibling_funds?: unknown[];
+    [key: string]: unknown;
+  };
   analyst_flags?: string[];
   [key: string]: unknown;
 }
@@ -50,12 +54,12 @@ export interface CandidateMatrix {
   rows: MatrixRow[];
 }
 
-export type Stage = "scored" | "shortlisted" | "interview" | "rejected";
+export type Stage = "analyzed" | "shortlisted" | "interview" | "rejected";
 
 /** Funnel counts + explicitly-set stages (in-memory on the server; default
- *  stage for everyone not listed is "scored"). */
+ *  stage for everyone not listed is "analyzed"). */
 export interface PipelineState {
-  scored: number;
+  analyzed: number;
   shortlisted: number;
   interview: number;
   stages: Record<string, Stage>;
@@ -177,6 +181,7 @@ export interface CandPeer {
   short: string;
   fund: string;
   cand: string;
+  id: string;
   ret: number;
   vol: number;
   dd: number;
@@ -189,12 +194,12 @@ export interface OppPoint {
   cagr: number;
   dd: number;
   alpha: number | null;
-  stage: "scored" | "shortlisted" | "interview";
+  stage: "analyzed" | "shortlisted" | "interview";
 }
 
 export interface OpportunityMapData {
   title: string;
-  funnel: { scored: number; shortlisted: number; interview: number };
+  funnel: { analyzed: number; shortlisted: number; interview: number };
   pool: { candidates: number; funds: number };
   points: OppPoint[];
 }

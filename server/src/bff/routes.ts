@@ -55,7 +55,11 @@ function summarize(name: string, rec: CandidateRecord): CandidateSummary {
 function findCandidate(ds: Dataset, id: string): [string, CandidateRecord] | undefined {
   const key = id.toLowerCase();
   return Object.entries(ds.candidates).find(
-    ([name, rec]) => slug(name) === key || name.toLowerCase() === key || rec.pm_id === id,
+    ([name, rec]) =>
+      slug(name) === key ||
+      name.toLowerCase() === key ||
+      rec.pm_id === id ||
+      (rec.subject_fund?.fund_id as string | undefined)?.toLowerCase() === key,
   );
 }
 
@@ -210,7 +214,7 @@ bff.get("/candidates/:id/returns", send((req) => {
 
 /* ── Pipeline (shortlist / interview stage) ─────────────────────────────────── */
 
-const STAGES: Stage[] = ["scored", "shortlisted", "interview", "rejected"];
+const STAGES: Stage[] = ["analyzed", "shortlisted", "interview", "rejected"];
 
 /** Funnel counts + each candidate's current stage. */
 bff.get("/pipeline", send(async () => {
@@ -219,7 +223,7 @@ bff.get("/pipeline", send(async () => {
   return { ...funnelCounts(ids), stages: allStages() };
 }));
 
-/** Set a candidate's stage (scored | shortlisted | interview). */
+/** Set a candidate's stage (analyzed | shortlisted | interview). */
 bff.put("/pipeline/:id", send(async (req) => {
   const stage = (req.body ?? {}).stage as Stage;
   if (!STAGES.includes(stage)) throw new DataNotFound(`Invalid stage: ${stage}. One of: ${STAGES.join(", ")}.`);
@@ -288,9 +292,11 @@ bff.get("/renderers", send(() => RENDERERS));
 
 /** Generic renderer endpoint — one handler serves `{label}` and every D1-x.
  *  Data is populated from data.json per label (per-fund via `?candidate=`).
- *  The 8 Peer Fit & Sim labels (D1-5/6/6b/7/7b/8/9/9b) instead return the
- *  guide's `{schema, rows, attrs, identity}` envelope, backed by mock data —
- *  see `PEERFIT_LABELS`/`buildPeerFitRenderer` in `data/peerfit.ts`. */
+ *  The 8 Peer Fit & Sim labels (D1-5/6/6b/7/7b/8/9/9b) instead go through
+ *  `buildPeerFitRenderer`, which prefers a candidate's real precomputed panel
+ *  when a completed analytics run exists and falls back to mock data
+ *  otherwise — see `PEERFIT_LABELS`/`STATIC_PANEL_LABELS` in
+ *  `data/peerfit.ts`. */
 bff.get("/renderers/:label", send((req) => {
   const r = RENDERER_BY_LABEL.get(req.params.label);
   if (!r) throw new DataNotFound(`Unknown renderer: ${req.params.label}`);
@@ -312,5 +318,19 @@ bff.get("/renderers/:label", send((req) => {
     return buildPeerFitRenderer(r.label, candidate ?? "", params, { source: str(req.query.source) });
   }
 
-  return { label: r.label, description: r.description, candidate: candidate ?? null, data: buildRendererData(r.label, candidate) };
+  // Completed-run panel files key axis/kind/stress_model variants literally,
+  // e.g. "D1-10?axis=sector" — build the same key so the real-data lookup
+  // (see buildRendererData) finds the right variant instead of the bare label.
+  const axis = str(req.query.axis);
+  const kind = str(req.query.kind);
+  const stressModel = str(req.query.stress_model);
+  const variant = axis ? `axis=${axis}` : kind ? `kind=${kind}` : stressModel ? `stress_model=${stressModel}` : undefined;
+  const panelKey = variant ? `${r.label}?${variant}` : r.label;
+
+  const built = buildRendererData(r.label, candidate, panelKey);
+  // A real completed-run panel is already a `{schema, rows, attrs, identity}`
+  // envelope (see buildRendererData) — return it as-is so it matches the
+  // Peer Fit labels' shape. Otherwise keep the legacy stub wrapper.
+  if (built && typeof built === "object" && "schema" in built && "rows" in built) return built;
+  return { label: r.label, description: r.description, candidate: candidate ?? null, data: built };
 }));

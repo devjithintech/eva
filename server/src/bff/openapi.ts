@@ -114,13 +114,13 @@ const OpportunityMap = {
   type: "object",
   properties: {
     title: { type: "string" },
-    funnel: { type: "object", properties: { scored: { type: "integer" }, shortlisted: { type: "integer" }, interview: { type: "integer" } } },
+    funnel: { type: "object", properties: { analyzed: { type: "integer" }, shortlisted: { type: "integer" }, interview: { type: "integer" } } },
     pool: { type: "object", properties: { candidates: { type: "integer" }, funds: { type: "integer" } } },
     points: {
       type: "array",
       items: {
         type: "object",
-        properties: { name: { type: "string" }, cagr: { type: "number" }, dd: { type: "number" }, stage: { type: "string", enum: ["scored", "shortlisted", "interview"] } },
+        properties: { name: { type: "string" }, cagr: { type: "number" }, dd: { type: "number" }, stage: { type: "string", enum: ["analyzed", "shortlisted", "interview"] } },
       },
     },
   },
@@ -129,10 +129,10 @@ const OpportunityMap = {
 const PipelineState = {
   type: "object",
   properties: {
-    scored: { type: "integer", example: 57 },
+    analyzed: { type: "integer", example: 57 },
     shortlisted: { type: "integer", example: 3 },
     interview: { type: "integer", example: 1 },
-    stages: { type: "object", additionalProperties: { type: "string", enum: ["scored", "shortlisted", "interview"] }, description: "Explicitly-set stages, keyed by candidate id." },
+    stages: { type: "object", additionalProperties: { type: "string", enum: ["analyzed", "shortlisted", "interview"] }, description: "Explicitly-set stages, keyed by candidate id." },
   },
 };
 
@@ -288,7 +288,7 @@ export const openapi = {
     "/runs/{id}": { get: { tags: ["Pipelines & runs"], summary: "Fetch a run", operationId: "getRun", parameters: [idParam], responses: { 200: { description: "Run", content: jsonObj("#/components/schemas/Run") } } } },
 
     "/pipeline": { get: { tags: ["Pipeline"], summary: "Funnel counts + candidate stages", operationId: "getPipeline", responses: { 200: { description: "Funnel + stages", content: jsonObj("#/components/schemas/PipelineState") } } } },
-    "/pipeline/{id}": { put: { tags: ["Pipeline"], summary: "Set a candidate's stage", operationId: "setPipelineStage", parameters: [idParam], requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["stage"], properties: { stage: { type: "string", enum: ["scored", "shortlisted", "interview"] } } } } } }, responses: { 200: { description: "Updated stage" }, 404: notFound } } },
+    "/pipeline/{id}": { put: { tags: ["Pipeline"], summary: "Set a candidate's stage", operationId: "setPipelineStage", parameters: [idParam], requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["stage"], properties: { stage: { type: "string", enum: ["analyzed", "shortlisted", "interview"] } } } } } }, responses: { 200: { description: "Updated stage" }, 404: notFound } } },
 
     "/renderers": { get: { tags: ["Renderers"], summary: "List renderers", operationId: "listRenderers", responses: { 200: { description: "Renderers", content: jsonArray("#/components/schemas/Renderer") } } } },
     "/renderers/{label}": { get: { tags: ["Renderers"], summary: "Generic renderer endpoint", operationId: "getRenderer", parameters: [{ name: "label", in: "path", required: true, schema: { type: "string" }, example: "D1-1" }, ...rendererParams], responses: { 200: { description: "Renderer payload", content: { "application/json": { schema: { type: "object", additionalProperties: true } } } }, 404: notFound } } },

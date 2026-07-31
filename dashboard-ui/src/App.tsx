@@ -34,7 +34,7 @@ function useHashRoute(): Route {
 
 export function App() {
   const route = useHashRoute();
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
 
   return (
     <>

@@ -5,7 +5,7 @@ interface Props {
   onChange: (key: string | null) => void;
 }
 
-/** Quick A-Z / 0-9 first-letter filter strip (Scored tab). */
+/** Quick A-Z / 0-9 first-letter filter strip (Analyzed tab). */
 export function AzFilterStrip({ active, onChange }: Props) {
   return (
     <div className="az-strip">

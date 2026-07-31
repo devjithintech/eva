@@ -5,18 +5,34 @@ import { SelectInterviewDialog } from "./SelectInterviewDialog";
 import { ShareProfileDialog } from "./ShareProfileDialog";
 import { AddNoteDialog } from "./AddNoteDialog";
 import { RejectCandidateDialog } from "./RejectCandidateDialog";
+import { ExecutiveSummaryModal } from "./ExecutiveSummaryModal";
+
+const ZAP_ICON = (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M15.914 4a1.5 1.5 0 0 0-2.474-1.561l-9 9A1.5 1.5 0 0 0 5.5 14h4.002a.5.5 0 0 1 .471.666L8.086 20a1.5 1.5 0 0 0 2.475 1.56l9-9A1.5 1.5 0 0 0 18.5 10h-3.997a.5.5 0 0 1-.472-.667z" />
+  </svg>
+);
 
 export interface TableRow extends MatrixRow {
   id: string;
   stage: Stage;
   flagCount: number;
+  fundName: string | null;
 }
 
 type SortKey = "alpha" | "cagr" | "sharpe" | "dd";
 
 interface Props {
   rows: TableRow[];
-  scores: Map<string, number | null>;
   compareMode: boolean;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -26,25 +42,42 @@ interface Props {
 }
 
 const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "alpha", label: "Alpha" },
+  { key: "alpha", label: "Jensen's α" },
   { key: "cagr", label: "5-yr CAGR" },
   { key: "sharpe", label: "Sharpe" },
   { key: "dd", label: "Max DD" },
 ];
 
-const fmtPct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`);
+const fmtPct = (v: number | null) =>
+  v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
 const fmtNum = (v: number | null) => (v == null ? "—" : v.toFixed(2));
 
 type ActionType = "select" | "share" | "note" | "reject";
 
-export function CandidateTable({ rows, scores, compareMode, selected, onToggleSelect, onShortlist, onAdvance, onReject }: Props) {
+export function CandidateTable({
+  rows,
+  compareMode,
+  selected,
+  onToggleSelect,
+  onShortlist,
+  onAdvance,
+  onReject,
+}: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("alpha");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
-  const [action, setAction] = useState<{ type: ActionType; id: string; name: string } | null>(null);
+  const [action, setAction] = useState<{
+    type: ActionType;
+    id: string;
+    name: string;
+  } | null>(null);
+  const [zapId, setZapId] = useState<string | null>(null);
 
   const sorted = useMemo(() => {
     const copy = [...rows];
-    copy.sort((a, b) => ((a[sortKey] ?? -Infinity) - (b[sortKey] ?? -Infinity)) * sortDir);
+    copy.sort(
+      (a, b) =>
+        ((a[sortKey] ?? -Infinity) - (b[sortKey] ?? -Infinity)) * sortDir,
+    );
     return copy;
   }, [rows, sortKey, sortDir]);
 
@@ -66,13 +99,20 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
         <thead>
           <tr>
             {compareMode && <th style={{ width: 34 }}></th>}
-            <th className="r" style={{ width: 30 }}>#</th>
+            <th className="r" style={{ width: 30 }}>
+              #
+            </th>
             <th>Candidate</th>
-            <th style={{ width: 60 }}>Score</th>
             {COLUMNS.map((c) => (
-              <th key={c.key} className="r sortable" onClick={() => sortClick(c.key)}>
+              <th
+                key={c.key}
+                className="r sortable"
+                onClick={() => sortClick(c.key)}
+              >
                 {c.label}
-                <span className="sar">{sortKey === c.key ? (sortDir === -1 ? "▼" : "▲") : ""}</span>
+                <span className="sar">
+                  {sortKey === c.key ? (sortDir === -1 ? "▼" : "▲") : ""}
+                </span>
               </th>
             ))}
             <th className="cl-more"></th>
@@ -98,25 +138,54 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
               )}
               <td className="cl-rank">{i + 1}</td>
               <td className="cl-cand">
-                <div className="nm">{r.name}</div>
-                {r.flagCount > 0 && <div className="fn">⚑ {r.flagCount} analyst flag{r.flagCount === 1 ? "" : "s"}</div>}
+                <div className="nm">
+                  {r.name}
+                  <button
+                    type="button"
+                    className="nm-zap"
+                    aria-label={`Executive summary for ${r.name}`}
+                    title="Executive summary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setZapId(r.id);
+                    }}
+                  >
+                    {ZAP_ICON}
+                  </button>
+                </div>
+                {r.fundName && <div className="fn">{r.fundName}</div>}
               </td>
-              <td className="r">
-                <span className="cl-ais">{scores.get(r.name) ?? "—"}</span>
+              <td
+                className={`r ${r.alpha != null ? (r.alpha >= 0 ? "pos" : "neg") : ""}`}
+              >
+                {fmtPct(r.alpha)}
               </td>
-              <td className={`r ${r.alpha != null ? (r.alpha >= 0 ? "pos" : "neg") : ""}`}>{fmtPct(r.alpha)}</td>
-              <td className={`r ${r.cagr != null ? (r.cagr >= 0 ? "pos" : "neg") : ""}`}>{fmtPct(r.cagr)}</td>
+              <td
+                className={`r ${r.cagr != null ? (r.cagr >= 0 ? "pos" : "neg") : ""}`}
+              >
+                {fmtPct(r.cagr)}
+              </td>
               <td className="r">{fmtNum(r.sharpe)}</td>
               <td className="r neg">{fmtPct(r.dd)}</td>
               <td className="cl-more" onClick={(e) => e.stopPropagation()}>
                 <RowActionsMenu
-                  showShortlist={r.stage !== "shortlisted" && r.stage !== "interview"}
+                  showShortlist={
+                    r.stage !== "shortlisted" && r.stage !== "interview"
+                  }
                   showInterview={r.stage !== "interview"}
                   onShortlist={() => onShortlist(r.id)}
-                  onSelectInterview={() => setAction({ type: "select", id: r.id, name: r.name })}
-                  onShare={() => setAction({ type: "share", id: r.id, name: r.name })}
-                  onAddNote={() => setAction({ type: "note", id: r.id, name: r.name })}
-                  onReject={() => setAction({ type: "reject", id: r.id, name: r.name })}
+                  onSelectInterview={() =>
+                    setAction({ type: "select", id: r.id, name: r.name })
+                  }
+                  onShare={() =>
+                    setAction({ type: "share", id: r.id, name: r.name })
+                  }
+                  onAddNote={() =>
+                    setAction({ type: "note", id: r.id, name: r.name })
+                  }
+                  onReject={() =>
+                    setAction({ type: "reject", id: r.id, name: r.name })
+                  }
                 />
               </td>
             </tr>
@@ -132,8 +201,15 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
           if (action) onAdvance(action.id);
         }}
       />
-      <ShareProfileDialog open={action?.type === "share"} onClose={() => setAction(null)} candidateName={action?.name ?? ""} />
-      <AddNoteDialog open={action?.type === "note"} onClose={() => setAction(null)} />
+      <ShareProfileDialog
+        open={action?.type === "share"}
+        onClose={() => setAction(null)}
+        candidateName={action?.name ?? ""}
+      />
+      <AddNoteDialog
+        open={action?.type === "note"}
+        onClose={() => setAction(null)}
+      />
       <RejectCandidateDialog
         open={action?.type === "reject"}
         onClose={() => setAction(null)}
@@ -142,6 +218,7 @@ export function CandidateTable({ rows, scores, compareMode, selected, onToggleSe
           if (action) onReject(action.id);
         }}
       />
+      <ExecutiveSummaryModal id={zapId} onClose={() => setZapId(null)} />
     </div>
   );
 }

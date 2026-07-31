@@ -1,133 +1,109 @@
+/** Risk research — portfolio risk, exposure, concentration, liquidity, risk
+ *  decomposition, style-factor decomposition, sector/industry/country/region
+ *  breakdowns, position summary, and stress scenarios. Backed by real
+ *  precomputed renderer output (`GET /renderers/D1-10|11|12|13|14|15|16|17|18`)
+ *  for candidates that have a completed analytics run (see
+ *  `server/data/candidate_panels/`). Most candidates don't have one yet —
+ *  this shows an explicit empty state rather than fabricating numbers. */
 import { useState } from "react";
+import { useRenderer } from "../../api/hooks";
+import { LoadingState } from "../common/LoadingState";
+import { ErrorState } from "../common/ErrorState";
+import { fmtValue, pctFmt } from "../../lib/metricFormat";
 
-/** Risk research — the design reference shows a full third-party risk-model
- *  decomposition (predicted vol/beta, style/sector/country risk splits,
- *  stress-scenario replays, position summary, provenance) with no equivalent
- *  field anywhere in this dataset. Intentionally static/illustrative, same
- *  rationale as PortfolioAnalysisSection — shows the intended shape rather
- *  than fabricating specific numbers per real candidate. */
+interface MetricRow {
+  metric: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  description: string;
+  format: string | null;
+}
 
-const DECOMP: { label: string; pct: number }[] = [
-  { label: "Residual", pct: 84.57 },
-  { label: "Style", pct: 8.7 },
-  { label: "Market", pct: 0.6 },
-  { label: "Country", pct: 1.08 },
-  { label: "Currency", pct: 0.15 },
-  { label: "Industry", pct: 4.9 },
-];
-const decompBar = (pct: number) => `${Math.max(6, Math.round(pct * 1.64))}px`;
+interface ExposureRow {
+  direction: string;
+  count: number;
+  gross_pct: number;
+}
 
-const STYLE_FACTORS: { name: string; vol: number; net: number; risk: number }[] = [
-  { name: "Size", vol: 3.56, net: 20.56, risk: 4.82 },
-  { name: "Value", vol: 1.38, net: -23.55, risk: 2.45 },
-  { name: "Market sensitivity", vol: 4.19, net: 10.35, risk: -1.5 },
-  { name: "Volatility", vol: 3.79, net: -7.58, risk: 0.94 },
-  { name: "Leverage", vol: 0.89, net: -21.28, risk: 0.69 },
-  { name: "Profitability", vol: 1.04, net: 17.21, risk: 0.5 },
-  { name: "Dividend yield", vol: 0.91, net: -7.82, risk: 0.36 },
-  { name: "Growth", vol: 0.69, net: 6.7, risk: 0.18 },
-  { name: "Exchange rate sensitivity", vol: 0.83, net: 8.31, risk: 0.09 },
-  { name: "Earnings yield", vol: 1.38, net: 4.83, risk: 0.07 },
-  { name: "Liquidity", vol: 1.67, net: -1.25, risk: 0.06 },
-  { name: "Medium-term momentum", vol: 2.59, net: 1.28, risk: 0.05 },
-  { name: "Short-term momentum", vol: 2.3, net: 0.04, risk: 0.0 },
-];
-const styleBar = (risk: number) => `${Math.max(6, Math.round(Math.abs(risk) * 31))}px`;
+interface ConcentrationRow {
+  metric: string;
+  gross_pct: number;
+}
 
-type SectorRow = { name: string; gross: number; net: number; risk: number };
-const SECTORS: SectorRow[] = [
-  { name: "Total", gross: 100.0, net: -2.65, risk: 4.9 },
-  { name: "Industrials", gross: 33.53, net: -2.65, risk: 1.59 },
-  { name: "Health care", gross: 18.14, net: 0.49, risk: 1.41 },
-  { name: "Financials", gross: 12.5, net: 0.74, risk: 0.83 },
-  { name: "Consumer discretionary", gross: 4.9, net: -1.96, risk: 0.58 },
-  { name: "Consumer staples", gross: 10.69, net: 2.84, risk: 0.36 },
-  { name: "Information technology", gross: 9.71, net: -0.39, risk: 0.19 },
-  { name: "Materials", gross: 6.62, net: 2.21, risk: -0.16 },
-  { name: "Real estate", gross: 3.92, net: -3.92, risk: 0.1 },
-];
-const TOP_INDUSTRY: SectorRow[] = [
-  { name: "Total (top 5)", gross: 13.73, net: -2.94, risk: 3.46 },
-  { name: "Health care equipment & supplies", gross: 6.13, net: 4.66, risk: 1.89 },
-  { name: "Banks", gross: 2.7, net: -2.7, risk: 1.13 },
-  { name: "Health care technology", gross: 1.47, net: -1.47, risk: -0.54 },
-  { name: "Auto components", gross: 1.96, net: -1.96, risk: 0.53 },
-  { name: "Trading companies & distributors", gross: 1.47, net: -1.47, risk: 0.45 },
-];
-const TOP_COUNTRY: SectorRow[] = [
-  { name: "Total", gross: 100.0, net: -2.65, risk: 1.08 },
-  { name: "Denmark", gross: 2.94, net: 2.94, risk: 0.65 },
-  { name: "Switzerland", gross: 97.06, net: -5.59, risk: 0.43 },
-];
-const TOP_MARKET: SectorRow[] = [
-  { name: "Total", gross: 100.0, net: -2.65, risk: 0.6 },
-  { name: "Western Europe ex UK", gross: 100.0, net: -2.65, risk: 0.6 },
-];
+interface LiquidityRow {
+  bucket: string;
+  gross_pct: number;
+  count: number;
+}
 
-const LARGEST_RISK: { name: string; risk: number; weight: number }[] = [
-  { name: "BQE Cant Vaudoise", risk: -2.7, weight: 5.34 },
-  { name: "Lonza Group AG", risk: 3.43, weight: 4.16 },
-  { name: "Docmorris AG", risk: -0.74, weight: 3.88 },
-  { name: "Belimo Holding AG", risk: 2.94, weight: 3.34 },
-  { name: "DSV A/S", risk: 2.94, weight: 3.26 },
-];
-const SMALLEST_RISK: { name: string; weight: number; risk: number }[] = [
-  { name: "Baloise Holding AG", weight: 0.98, risk: -0.51 },
-  { name: "Vontobel Hldg AG", weight: 0.98, risk: -0.25 },
-  { name: "Bystronic AG", weight: 0.98, risk: -0.23 },
-  { name: "Interroll Hldg AG", weight: 0.49, risk: -0.09 },
-  { name: "Holcim Ltd", weight: 2.45, risk: -0.08 },
-];
-const LARGEST_HOLDINGS: { name: string; weight: number; risk: number }[] = [
-  { name: "Lonza Group AG", weight: 3.43, risk: 4.16 },
-  { name: "VZ Holding AG", weight: 3.19, risk: 2.76 },
-  { name: "DSV A/S", weight: 2.94, risk: 3.26 },
-  { name: "Belimo Holding AG", weight: 2.94, risk: 3.34 },
-  { name: "Holcim Ltd", weight: 2.45, risk: -0.08 },
-];
-const SMALLEST_HOLDINGS: { name: string; weight: number; risk: number }[] = [
-  { name: "BQE Cant Vaudoise", weight: -2.7, risk: 5.34 },
-  { name: "Swiss Prime Site", weight: -2.45, risk: 2.38 },
-  { name: "SFS Group AG", weight: -1.96, risk: 2.09 },
-  { name: "Tecan Group AG", weight: -1.96, risk: 2.68 },
-  { name: "Siegfried Hldg AG", weight: -1.96, risk: 2.87 },
-];
-const LEAST_LIQUID: { name: string; weight: number; days: number }[] = [
-  { name: "Hochdorf Holding", weight: 0.49, days: 102 },
-  { name: "Starrag Group", weight: 0.49, days: 33 },
-  { name: "Kudelski SA", weight: 0.74, days: 26 },
-  { name: "Orell Fuessli AG", weight: 0.49, days: 20 },
-  { name: "Molecular Partners", weight: 0.74, days: 18 },
-];
+interface ClassRow {
+  class: string;
+  variance: number;
+  pct_of_total: number;
+}
 
-const STRESS: { name: string; delta: number }[] = [
-  { name: "COVID snap (Mar '20)", delta: 1.85 },
-  { name: "Hedge fund sell-off (Jan '16)", delta: 0.92 },
-  { name: "HF sell-off (Oct–Nov '18)", delta: 0.45 },
-  { name: "LH unwind (Jan–Feb '16)", delta: 0.3 },
-  { name: "Market hedge fund selloff", delta: 0.85 },
-  { name: "Market selloff", delta: 0.2 },
-  { name: "Mkt sell-off (Fall '18)", delta: 0.6 },
-  { name: "MOpocalypse (Sept '19)", delta: 0.4 },
-  { name: "MOversal (Nov '17)", delta: 0.15 },
-  { name: "Santa slump ('18)", delta: 0.55 },
-  { name: "Shocktober ('18)", delta: 0.35 },
-  { name: "STONKS! Wednesday", delta: 0.25 },
-  { name: "UpStress", delta: -0.85 },
-  { name: "Volpocalypse (Feb '18)", delta: 0.5 },
-];
-const stressMag = (delta: number) => `${Math.round(Math.abs(delta) * 152)}px`;
+interface FactorDecompRow {
+  factor: string;
+  vol_pct: number;
+  net_pct: number;
+  risk_pct: number;
+  portfolio_beta: number;
+  variance: number;
+  pct_of_total: number;
+}
+
+interface CategoryRow {
+  category: string;
+  gross_pct: number;
+  net_pct: number;
+  risk_pct: number;
+  count: number;
+}
+
+/** D1-11's row shape depends on `kind`: notional/liquidity kinds carry
+ *  market_value/abs_weight, risk kinds carry weight/total_risk_pct instead. */
+interface PositionRow {
+  instrument: string;
+  market_value?: number;
+  abs_weight?: number;
+  weight?: number;
+  total_risk_pct?: number;
+  sector?: string | null;
+  days_to_liquidate?: number | null;
+}
+
+interface StressRow {
+  scenario: string;
+  pnl_pct: number;
+}
+
+interface Props {
+  id: string;
+}
+
+/** Sum a set of fractions into a synthetic "Total" row for a category table. */
+function withTotal(rows: CategoryRow[], totalLabel = "Total"): CategoryRow[] {
+  if (!rows.length) return rows;
+  const total = rows.reduce(
+    (acc, r) => ({
+      category: totalLabel,
+      gross_pct: acc.gross_pct + r.gross_pct,
+      net_pct: acc.net_pct + r.net_pct,
+      risk_pct: acc.risk_pct + r.risk_pct,
+      count: acc.count + r.count,
+    }),
+    { category: totalLabel, gross_pct: 0, net_pct: 0, risk_pct: 0, count: 0 },
+  );
+  return [total, ...rows];
+}
 
 function pctCell(v: number) {
   const neg = v < 0;
-  return (
-    <td className={`num${neg ? " neg" : ""}`}>
-      {neg ? `(${Math.abs(v).toFixed(2)}%)` : `${v.toFixed(2)}%`}
-    </td>
-  );
+  return <td className={`num${neg ? " neg" : ""}`}>{neg ? `(${Math.abs(v * 100).toFixed(2)}%)` : `${(v * 100).toFixed(2)}%`}</td>;
 }
 
-function SectorTable({ rows, nameLabel }: { rows: SectorRow[]; nameLabel: string }) {
+function CategoryTable({ rows, nameLabel }: { rows: CategoryRow[]; nameLabel: string }) {
   return (
     <table className="data">
       <thead>
@@ -140,17 +116,21 @@ function SectorTable({ rows, nameLabel }: { rows: SectorRow[]; nameLabel: string
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.name} className={r.name.startsWith("Total") ? "tot" : ""}>
-            <td>{r.name}</td>
-            {pctCell(r.gross)}
-            {pctCell(r.net)}
-            {pctCell(r.risk)}
+          <tr key={r.category} className={r.category.startsWith("Total") ? "tot" : ""}>
+            <td>{r.category}</td>
+            {pctCell(r.gross_pct)}
+            {pctCell(r.net_pct)}
+            {pctCell(r.risk_pct)}
           </tr>
         ))}
       </tbody>
     </table>
   );
 }
+
+const decompBar = (pct: number) => `${Math.max(6, Math.round(pct * 164))}px`;
+const styleBar = (risk: number, maxAbs: number) => `${Math.max(6, Math.round((maxAbs > 0 ? Math.abs(risk) / maxAbs : 0) * 190))}px`;
+const stressMag = (pct: number, maxAbs: number) => `${Math.max(1, Math.round((maxAbs > 0 ? Math.abs(pct) / maxAbs : 0) * 152))}px`;
 
 function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
   const sorted = [...rows].sort((a, b) => b.delta - a.delta);
@@ -159,8 +139,8 @@ function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
   const T = 16;
   const chartLeft = 300;
   const chartRight = 860;
-  const barMinX = chartLeft + 90; // gutter for the negative-bar value label
-  const barMaxX = chartRight - 60; // gutter for the positive-bar value label
+  const barMinX = chartLeft + 90;
+  const barMaxX = chartRight - 60;
   const maxPos = Math.max(0.01, ...sorted.map((r) => Math.max(r.delta, 0)));
   const maxNeg = Math.max(0.01, ...sorted.map((r) => Math.max(-r.delta, 0)));
   const total = maxPos + maxNeg;
@@ -169,11 +149,11 @@ function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
   const chartBottom = T + sorted.length * rowH;
   const H = chartBottom + 42;
 
-  const step = 0.5;
+  const step = Math.max(0.01, Math.round(((maxPos + maxNeg) / 8) * 100) / 100);
   const tickMin = Math.ceil(-maxNeg / step) * step;
   const tickMax = Math.floor(maxPos / step) * step;
   const ticks: number[] = [];
-  for (let t = tickMin; t <= tickMax + 1e-9; t += step) ticks.push(Math.round(t * 100) / 100);
+  for (let t = tickMin; t <= tickMax + 1e-9; t += step) ticks.push(Math.round(t * 1000) / 1000);
 
   return (
     <div className="stress-graph">
@@ -192,7 +172,7 @@ function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
               <rect x={barX} y={y - 5} width={barW} height={10} className={`sv-bar ${pos ? "pos" : "neg"}`} />
               <text x={pos ? barX + barW + 8 : barX - 8} y={y + 4} textAnchor={pos ? "start" : "end"} className={`sv-val ${pos ? "pos" : "neg"}`}>
                 {pos ? "+" : "−"}
-                {Math.abs(r.delta).toFixed(2)}%
+                {Math.abs(r.delta).toFixed(3)}%
               </text>
             </g>
           );
@@ -205,7 +185,7 @@ function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
               <line x1={x} y1={chartBottom + 8} x2={x} y2={chartBottom + 2} className="sv-axis" />
               <text x={x} y={chartBottom + 24} textAnchor="middle" className="sv-tick">
                 {t > 0 ? "+" : ""}
-                {t.toFixed(1)}%
+                {t.toFixed(3)}%
               </text>
             </g>
           );
@@ -218,304 +198,289 @@ function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
   );
 }
 
-export function RiskResearchSection() {
+export function RiskResearchSection({ id }: Props) {
   const [stressView, setStressView] = useState<"graph" | "list">("graph");
 
-  return (
-    <section id="riskresearch" className="sec">
-      <div className="sec-head">
-        <span className="sec-ic">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 14l3.5-3.5" />
-            <path d="M20.5 15.5a8.5 8.5 0 1 0-17 0" />
-          </svg>
-        </span>
-        <h2>Risk research</h2>
+  const portfolioRisk = useRenderer<MetricRow>("D1-15", id);
+  const exposure = useRenderer<ExposureRow>("D1-13", id);
+  const concentration = useRenderer<ConcentrationRow>("D1-14", id);
+  const liquidity = useRenderer<LiquidityRow>("D1-17", id);
+  const byClass = useRenderer<ClassRow>("D1-12", id, undefined, { axis: "by_class" });
+  const byFactor = useRenderer<FactorDecompRow>("D1-12", id, undefined, { axis: "by_factor" });
+  const sector = useRenderer<CategoryRow>("D1-10", id, undefined, { axis: "sector" });
+  const industry = useRenderer<CategoryRow>("D1-10", id, undefined, { axis: "industry" });
+  const country = useRenderer<CategoryRow>("D1-10", id, undefined, { axis: "country" });
+  const market = useRenderer<CategoryRow>("D1-18", id);
+  const largestRisk = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "largest_by_risk" });
+  const smallestRisk = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "smallest_by_risk" });
+  const largestNotional = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "largest_by_notional" });
+  const smallestNotional = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "smallest_by_notional" });
+  const leastLiquid = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "least_liquid" });
+  const stress = useRenderer<StressRow>("D1-16", id);
+
+  const resources = [
+    portfolioRisk, exposure, concentration, liquidity, byClass, byFactor,
+    sector, industry, country, market, largestRisk, smallestRisk,
+    largestNotional, smallestNotional, leastLiquid, stress,
+  ];
+
+  if (resources.some((r) => r.loading)) {
+    return (
+      <div id="risk" className="sec-body">
+        <LoadingState label="Loading risk research…" />
       </div>
-      <div className="sec-body">
-        <div className="rr-fchips">
-          <span className="rr-fchip">
-            <b>Gross</b>51,000,000
-          </span>
-          <span className="rr-fchip">
-            <b>Date</b>5/19/2023
-          </span>
-          <span className="rr-fchip">
-            <b>Model</b>WW4AxiomaSH
-          </span>
-        </div>
+    );
+  }
+  const firstError = resources.find((r) => r.error)?.error;
+  if (firstError) {
+    return (
+      <div id="risk" className="sec-body">
+        <ErrorState message={firstError} />
+      </div>
+    );
+  }
 
+  const hasRun = Array.isArray(portfolioRisk.data?.rows) && portfolioRisk.data!.rows.length > 0;
+  if (!hasRun) {
+    return (
+      <div id="risk" className="sec-body">
         <h3>Portfolio risk</h3>
-        <p className="note">Illustrative · Axioma Worldwide 4 — short-horizon factor risk model — no third-party risk feed is wired up for individual candidates yet.</p>
-        <div className="rr-stats">
-          <div className="rr-stat">
-            <div className="val">3.13%</div>
-            <div className="lbl">Predicted vol</div>
-          </div>
-          <div className="rr-stat">
-            <div className="val neg">(0.01)</div>
-            <div className="lbl">Predicted MXWO beta</div>
-          </div>
-          <div className="rr-stat">
-            <div className="val">0.07</div>
-            <div className="lbl">Historical beta</div>
-          </div>
-          <div className="rr-stat">
-            <div className="val">0.00</div>
-            <div className="lbl">Predicted beta</div>
-          </div>
-        </div>
+        <p className="note">
+          No completed risk-research run on file for this candidate yet. Analytics runs are currently available for
+          2E Capital, Academy Investment Management, and Adelio Partners.
+        </p>
+      </div>
+    );
+  }
 
-        <div className="rr-cards3">
-          <div className="card">
-            <div className="card-head">Exposure</div>
-            <div className="pa-row">
-              <span className="pa-k">Net (73 positions)</span>
-              <span className="pa-v negv">(2.65%)</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">Long (28)</span>
-              <span className="pa-v pos">48.68%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">Short (45)</span>
-              <span className="pa-v negv">(51.32%)</span>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-head">Concentration</div>
-            <div className="pa-row">
-              <span className="pa-k">Top 5</span>
-              <span className="pa-v">15.69%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">Top 10</span>
-              <span className="pa-v">28.43%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">Hedge / Other</span>
-              <span className="pa-v">0.00%</span>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-head">Liquidity ladder</div>
-            <div className="pa-row">
-              <span className="pa-k">&lt; 1 day</span>
-              <span className="pa-v">59%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">1–3 days</span>
-              <span className="pa-v">24%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">3–5 days</span>
-              <span className="pa-v">5%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">5–10 days</span>
-              <span className="pa-v">6%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">10–20 days</span>
-              <span className="pa-v">3%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">20–30 days</span>
-              <span className="pa-v">1%</span>
-            </div>
-            <div className="pa-row">
-              <span className="pa-k">30–60 / 90–180 days</span>
-              <span className="pa-v">0%</span>
-            </div>
-          </div>
-        </div>
+  const exposureAttrs = exposure.data?.attrs ?? {};
+  const gross = typeof exposureAttrs.gross === "number" ? exposureAttrs.gross : null;
+  const exposureRows = exposure.data?.rows ?? [];
+  const concentrationRows = concentration.data?.rows ?? [];
+  const liquidityRows = liquidity.data?.rows ?? [];
+  const weightedDaysToLiquidate = liquidity.data?.attrs?.weighted_days_to_liquidate as number | null | undefined;
+  const classRows = byClass.data?.rows ?? [];
+  const totalVariance = classRows.reduce((a, r) => a + r.pct_of_total, 0) || 1;
+  const factorRows = byFactor.data?.rows ?? [];
+  const topFactors = [...factorRows].sort((a, b) => Math.abs(b.risk_pct) - Math.abs(a.risk_pct)).slice(0, 12);
+  const maxAbsFactorRisk = Math.max(...topFactors.map((f) => Math.abs(f.risk_pct)), 1e-9);
+  const stressRows = (stress.data?.rows ?? []).map((r) => ({ name: r.scenario, delta: r.pnl_pct * 100 }));
+  const maxAbsStress = Math.max(...stressRows.map((r) => Math.abs(r.delta)), 1e-9);
+  const worstScenario = stress.data?.attrs?.worst as string | undefined;
+  const worstPnl = stress.data?.attrs?.worst_pnl_pct as number | undefined;
 
-        <h3>Risk decomposition</h3>
-        <p className="note">% of total portfolio variance</p>
-        <div className="rr-decomp">
-          {DECOMP.map((d) => (
-            <div className="rr-cell" key={d.label}>
-              <div className="lbl">{d.label}</div>
-              <div className="val2">{d.pct.toFixed(2)}%</div>
-              <span className="rbar" style={{ width: decompBar(d.pct) }} />
+  const positionCard = (title: string, rows: PositionRow[], metric: "weight" | "risk" | "notional" | "liquidity") => (
+    <div className="card">
+      <div className="card-head">{title}</div>
+      {rows.length === 0 && (
+        <p className="note" style={{ fontStyle: "italic", margin: 0 }}>
+          No positions reported.
+        </p>
+      )}
+      {rows.map((p) => {
+        const w = p.abs_weight ?? p.weight ?? 0;
+        const short = (p.market_value ?? 0) < 0;
+        return (
+          <div className="pa-row" key={p.instrument}>
+            <span className="pa-k">{p.instrument}</span>
+            <span className="pa-v">
+              {metric === "risk" && p.total_risk_pct != null && (
+                <span className={p.total_risk_pct < 0 ? "negv" : "pos"}>{pctFmt(p.total_risk_pct)}</span>
+              )}
+              {metric === "risk" && ` · ${pctFmt(w)}`}
+              {metric === "notional" && (short ? <span className="negv">({pctFmt(w)})</span> : pctFmt(w))}
+              {metric === "liquidity" && `${pctFmt(w)} · ${p.days_to_liquidate ?? "—"}d`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div id="risk" className="sec-body">
+      <div className="rr-fchips">
+        <span className="rr-fchip">
+          <b>Gross</b>
+          {gross != null ? `$${Math.round(gross).toLocaleString("en-US")}` : "—"}
+        </span>
+        <span className="rr-fchip">
+          <b>Positions</b>
+          {(exposureRows.find((r) => r.direction === "Net") ?? exposureRows[0])?.count ?? "—"}
+        </span>
+        <span className="rr-fchip">
+          <b>Model</b>Internal factor risk engine
+        </span>
+      </div>
+
+      <h3>Portfolio risk</h3>
+      <p className="note">From this candidate's completed analytics run · factor + specific risk decomposition</p>
+      <div className="rr-stats">
+        {(portfolioRisk.data?.rows ?? []).map((r) => (
+          <div className="rr-stat" key={r.metric}>
+            <div className={`val${(r.value ?? 0) < 0 ? " neg" : ""}`}>{fmtValue(r.value, r.format ?? ".2f")}</div>
+            <div className="lbl">{r.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rr-cards3">
+        <div className="card">
+          <div className="card-head">Exposure</div>
+          {exposureRows.map((r) => (
+            <div className="pa-row" key={r.direction}>
+              <span className="pa-k">
+                {r.direction} ({r.count})
+              </span>
+              <span className={`pa-v ${r.gross_pct < 0 ? "negv" : r.direction === "Long" ? "pos" : ""}`}>
+                {r.gross_pct < 0 ? `(${pctFmt(Math.abs(r.gross_pct))})` : pctFmt(r.gross_pct)}
+              </span>
             </div>
           ))}
         </div>
-
-        <h3>Style factor decomposition</h3>
-        <p className="note">Total style risk 8.70% · ordered by % of total risk</p>
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Style factor</th>
-              <th className="r">Vol</th>
-              <th className="r">% Net</th>
-              <th className="r">% Risk</th>
-              <th>Visual</th>
-            </tr>
-          </thead>
-          <tbody>
-            {STYLE_FACTORS.map((f) => (
-              <tr key={f.name}>
-                <td>{f.name}</td>
-                <td className="num">{f.vol.toFixed(2)}%</td>
-                {pctCell(f.net)}
-                {pctCell(f.risk)}
-                <td>
-                  <span className="rbar il" style={{ width: styleBar(f.risk) }} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <h3>Sector decomposition</h3>
-        <p className="note">% risk · ordered by contribution</p>
-        <div className="rr-cols">
-          <div>
-            <h4>Sector decomposition</h4>
-            <SectorTable rows={SECTORS} nameLabel="Sector" />
-          </div>
-          <div>
-            <h4>Top 5 industry</h4>
-            <SectorTable rows={TOP_INDUSTRY} nameLabel="Industry" />
-            <h4>Top 5 country</h4>
-            <SectorTable rows={TOP_COUNTRY} nameLabel="Country" />
-            <h4>Top 5 market</h4>
-            <SectorTable rows={TOP_MARKET} nameLabel="Market" />
-          </div>
+        <div className="card">
+          <div className="card-head">Concentration</div>
+          {concentrationRows.map((r) => (
+            <div className="pa-row" key={r.metric}>
+              <span className="pa-k">{r.metric}</span>
+              <span className="pa-v">{pctFmt(r.gross_pct)}</span>
+            </div>
+          ))}
         </div>
-
-        <h3>Position summary</h3>
-        <p className="note">Largest / smallest by risk and weight · least liquid</p>
-        <div className="rr-cards3">
-          <div className="card">
-            <div className="card-head">Largest risk contributors</div>
-            {LARGEST_RISK.map((p) => (
-              <div className="pa-row" key={p.name}>
-                <span className="pa-k">{p.name}</span>
-                <span className="pa-v">
-                  <span className={p.risk < 0 ? "negv" : "pos"}>{p.risk < 0 ? `(${Math.abs(p.risk).toFixed(2)}%)` : `${p.risk.toFixed(2)}%`}</span> · {p.weight.toFixed(2)}%
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="card">
-            <div className="card-head">Smallest risk contributors</div>
-            {SMALLEST_RISK.map((p) => (
-              <div className="pa-row" key={p.name}>
-                <span className="pa-k">{p.name}</span>
-                <span className="pa-v">
-                  {p.weight.toFixed(2)}% · <span className={p.risk < 0 ? "negv" : "pos"}>{p.risk < 0 ? `(${Math.abs(p.risk).toFixed(2)}%)` : `${p.risk.toFixed(2)}%`}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="card">
-            <div className="card-head">Hedge / Other</div>
-            <p className="note" style={{ fontStyle: "italic", margin: 0 }}>
-              No hedge or overlay positions in this portfolio.
-            </p>
-          </div>
-          <div className="card">
-            <div className="card-head">Largest holdings (by % gross)</div>
-            {LARGEST_HOLDINGS.map((p) => (
-              <div className="pa-row" key={p.name}>
-                <span className="pa-k">{p.name}</span>
-                <span className="pa-v">
-                  {p.weight.toFixed(2)}% · <span className={p.risk < 0 ? "negv" : "pos"}>{p.risk < 0 ? `(${Math.abs(p.risk).toFixed(2)}%)` : `${p.risk.toFixed(2)}%`}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="card">
-            <div className="card-head">Smallest holdings (most short)</div>
-            {SMALLEST_HOLDINGS.map((p) => (
-              <div className="pa-row" key={p.name}>
-                <span className="pa-k">{p.name}</span>
-                <span className="pa-v">
-                  <span className="negv">({Math.abs(p.weight).toFixed(2)}%)</span> · {p.risk.toFixed(2)}%
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="card">
-            <div className="card-head">Top 5 least liquid</div>
-            {LEAST_LIQUID.map((p) => (
-              <div className="pa-row" key={p.name}>
-                <span className="pa-k">{p.name}</span>
-                <span className="pa-v">{p.weight.toFixed(2)}% · {p.days}d</span>
-              </div>
-            ))}
-          </div>
+        <div className="card">
+          <div className="card-head">Liquidity ladder</div>
+          {liquidityRows.map((r) => (
+            <div className="pa-row" key={r.bucket}>
+              <span className="pa-k">{r.bucket.replace("D", " days").replace("<1 days", "< 1 day")}</span>
+              <span className="pa-v">{pctFmt(r.gross_pct, 0)}</span>
+            </div>
+          ))}
+          {weightedDaysToLiquidate != null && (
+            <div className="pa-row">
+              <span className="pa-k">Weighted days to liquidate</span>
+              <span className="pa-v">{weightedDaysToLiquidate.toFixed(1)}d</span>
+            </div>
+          )}
         </div>
+      </div>
 
-        <h3>
-          Stress scenarios
-          <span className="seg">
-            <button type="button" className={stressView === "graph" ? "on" : ""} onClick={() => setStressView("graph")}>
-              Graph
-            </button>
-            <button type="button" className={stressView === "list" ? "on" : ""} onClick={() => setStressView("list")}>
-              List
-            </button>
-          </span>
-        </h3>
-        <p className="note">Hypothetical P&amp;L under 14 historical regime episodes · % of gross</p>
-        {stressView === "graph" ? (
-          <StressGraph rows={STRESS} />
-        ) : (
+      {classRows.length > 0 && (
+        <>
+          <h3>Risk decomposition</h3>
+          <p className="note">% of total predicted variance</p>
+          <div className="rr-decomp">
+            {classRows.map((c) => (
+              <div className="rr-cell" key={c.class}>
+                <div className="lbl">{c.class}</div>
+                <div className="val2">{pctFmt(c.pct_of_total / totalVariance)}</div>
+                <span className="rbar" style={{ width: decompBar(c.pct_of_total / totalVariance) }} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {topFactors.length > 0 && (
+        <>
+          <h3>Style factor decomposition</h3>
+          <p className="note">
+            Top {topFactors.length} of {factorRows.length} factors by |% of total risk|
+          </p>
           <table className="data">
             <thead>
               <tr>
-                <th>Scenario</th>
-                <th className="r">Δ (% gross)</th>
-                <th>Magnitude</th>
+                <th>Factor</th>
+                <th className="r">Vol</th>
+                <th className="r">% Net</th>
+                <th className="r">% Risk</th>
+                <th>Visual</th>
               </tr>
             </thead>
             <tbody>
-              {STRESS.map((s) => (
-                <tr key={s.name}>
-                  <td>{s.name}</td>
-                  <td className={`num ${s.delta < 0 ? "neg" : "pos"}`}>
-                    {s.delta < 0 ? `(${Math.abs(s.delta).toFixed(2)}%)` : `+${s.delta.toFixed(2)}%`}
-                  </td>
+              {topFactors.map((f) => (
+                <tr key={f.factor}>
+                  <td>{f.factor}</td>
+                  <td className="num">{f.vol_pct.toFixed(2)}%</td>
+                  {pctCell(f.net_pct)}
+                  {pctCell(f.risk_pct)}
                   <td>
-                    <span className={`mag ${s.delta < 0 ? "negm" : "pos"}`} style={{ width: stressMag(s.delta) }} />
+                    <span className="rbar il" style={{ width: styleBar(f.risk_pct, maxAbsFactorRisk) }} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-        <p className="note rr-foot">
-          Worst-case scenario is the UpStress regime — a portfolio dollar-short on net exposure would underperform if equity markets rally sharply on
-          a broad style reversal. All other regimes shown are positive, consistent with a defensive book.
-        </p>
+        </>
+      )}
 
-        <h3>Provenance</h3>
-        <p className="note">Risk model + source files</p>
-        <div className="card">
-          <div className="prov">
-            <span className="prov-mark">AX</span>
-            <div>
-              <div className="prov-title">Axioma Worldwide 4 (Short Horizon) — WW4AxiomaSH</div>
-              <span className="prov-link">qontigo.com/axioma-risk-model-machine</span>
-              <div className="meta2">
-                As-of 5 May 2023 · 73 positions priced · single-day predicted vol horizon · style + sector + country + currency + industry factor
-                decomposition
-              </div>
-              <div className="rr-fchips">
-                <span className="rr-fchip">predicted-vol</span>
-                <span className="rr-fchip">factor-decomp</span>
-                <span className="rr-fchip">stress-replay</span>
-                <span className="rr-fchip">liquidity-ladder</span>
-                <span className="rr-fchip">axioma-ww4-sh</span>
-              </div>
-            </div>
-          </div>
+      <h3>Sector decomposition</h3>
+      <p className="note">% risk · ordered by contribution</p>
+      <div className="rr-cols">
+        <div>
+          <h4>Sector decomposition</h4>
+          <CategoryTable rows={withTotal(sector.data?.rows ?? [])} nameLabel="Sector" />
+        </div>
+        <div>
+          <h4>Top 5 industry</h4>
+          <CategoryTable rows={withTotal([...(industry.data?.rows ?? [])].sort((a, b) => b.gross_pct - a.gross_pct).slice(0, 5), "Total (top 5)")} nameLabel="Industry" />
+          <h4>Top 5 country</h4>
+          <CategoryTable rows={withTotal([...(country.data?.rows ?? [])].sort((a, b) => b.gross_pct - a.gross_pct).slice(0, 5), "Total (top 5)")} nameLabel="Country" />
+          <h4>Top 5 market</h4>
+          <CategoryTable rows={withTotal([...(market.data?.rows ?? [])].sort((a, b) => b.gross_pct - a.gross_pct).slice(0, 5), "Total (top 5)")} nameLabel="Market" />
         </div>
       </div>
-    </section>
+
+      <h3>Position summary</h3>
+      <p className="note">Largest / smallest by risk and weight · least liquid</p>
+      <div className="rr-cards3">
+        {positionCard("Largest risk contributors", largestRisk.data?.rows ?? [], "risk")}
+        {positionCard("Smallest risk contributors", smallestRisk.data?.rows ?? [], "risk")}
+        {positionCard("Largest holdings (by % gross)", largestNotional.data?.rows ?? [], "notional")}
+        {positionCard("Smallest holdings (most short)", smallestNotional.data?.rows ?? [], "notional")}
+        {positionCard("Top 5 least liquid", leastLiquid.data?.rows ?? [], "liquidity")}
+      </div>
+
+      <h3>
+        Stress scenarios
+        <span className="seg">
+          <button type="button" className={stressView === "graph" ? "on" : ""} onClick={() => setStressView("graph")}>
+            Graph
+          </button>
+          <button type="button" className={stressView === "list" ? "on" : ""} onClick={() => setStressView("list")}>
+            List
+          </button>
+        </span>
+      </h3>
+      <p className="note">Hypothetical P&amp;L under {stressRows.length} historical regime episodes · % of gross</p>
+      {stressView === "graph" ? (
+        <StressGraph rows={stressRows} />
+      ) : (
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th className="r">Δ (% gross)</th>
+              <th>Magnitude</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...stressRows].sort((a, b) => b.delta - a.delta).map((s) => (
+              <tr key={s.name}>
+                <td>{s.name}</td>
+                <td className={`num ${s.delta < 0 ? "neg" : "pos"}`}>{s.delta < 0 ? `(${Math.abs(s.delta).toFixed(3)}%)` : `+${s.delta.toFixed(3)}%`}</td>
+                <td>
+                  <span className={`mag ${s.delta < 0 ? "negm" : "pos"}`} style={{ width: stressMag(s.delta, maxAbsStress) }} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {worstScenario && (
+        <p className="note rr-foot">
+          Worst-case scenario on file is {worstScenario} ({((worstPnl ?? 0) * 100).toFixed(3)}% of gross).
+        </p>
+      )}
+    </div>
   );
 }

@@ -3,20 +3,20 @@
  * candidates have been shortlisted / selected for interview. In-memory for now
  * (resets on restart); swap for a DB later. Keyed by candidate slug id.
  */
-export type Stage = "scored" | "shortlisted" | "interview" | "rejected";
+export type Stage = "analyzed" | "shortlisted" | "interview" | "rejected";
 
-/** Ordinal rank so interview ⊇ shortlisted ⊇ scored. Rejected sits outside the
- *  funnel (not counted as shortlisted/interview progress). */
-export const STAGE_RANK: Record<Stage, number> = { scored: 0, shortlisted: 1, interview: 2, rejected: -1 };
+/** Ordinal rank so interview ⊇ shortlisted ⊇ analyzed. Rejected sits outside
+ *  the funnel (not counted as shortlisted/interview progress). */
+export const STAGE_RANK: Record<Stage, number> = { analyzed: 0, shortlisted: 1, interview: 2, rejected: -1 };
 
 const stages = new Map<string, Stage>();
 
 export function getStage(id: string): Stage {
-  return stages.get(id) ?? "scored";
+  return stages.get(id) ?? "analyzed";
 }
 
 export function setStage(id: string, stage: Stage): void {
-  if (stage === "scored") stages.delete(id);
+  if (stage === "analyzed") stages.delete(id);
   else stages.set(id, stage);
 }
 
@@ -25,8 +25,8 @@ export function allStages(): Record<string, Stage> {
   return Object.fromEntries(stages);
 }
 
-/** Funnel counts over the given candidate ids (scored = all). */
-export function funnelCounts(ids: string[]): { scored: number; shortlisted: number; interview: number } {
+/** Funnel counts over the given candidate ids (analyzed = all). */
+export function funnelCounts(ids: string[]): { analyzed: number; shortlisted: number; interview: number } {
   let shortlisted = 0;
   let interview = 0;
   for (const id of ids) {
@@ -34,5 +34,5 @@ export function funnelCounts(ids: string[]): { scored: number; shortlisted: numb
     if (r >= 1) shortlisted++;
     if (r >= 2) interview++;
   }
-  return { scored: ids.length, shortlisted, interview };
+  return { analyzed: ids.length, shortlisted, interview };
 }

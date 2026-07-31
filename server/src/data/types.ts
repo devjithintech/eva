@@ -131,12 +131,12 @@ export interface OppPoint {
   cagr: number;
   dd: number;
   alpha: number | null;
-  stage: "scored" | "shortlisted" | "interview";
+  stage: "analyzed" | "shortlisted" | "interview";
 }
 
 export interface OpportunityMapPayload {
   title: string;
-  funnel: { scored: number; shortlisted: number; interview: number };
+  funnel: { analyzed: number; shortlisted: number; interview: number };
   pool: { candidates: number; funds: number };
   points: OppPoint[];
 }

@@ -14,7 +14,7 @@ export const ARTIFACT_TOOLS: LLMTool[] = [
   {
     name: "render_opportunity_map",
     description:
-      "Show the CANDIDATE POOL overview: the opportunity scatter map (candidates by CAGR × drawdown) plus the scored→shortlisted→interview funnel. Use when the user asks for the 'candidate pool', \"today's candidate pool\", 'how's the pool', the field today, the opportunity map, or the funnel. Do NOT use for the ranked candidate list — that's render_candidate_pool.",
+      "Show the CANDIDATE POOL overview: the opportunity scatter map (candidates by CAGR × drawdown) plus the analyzed→shortlisted→interview funnel. Use when the user asks for the 'candidate pool', \"today's candidate pool\", 'how's the pool', the field today, the opportunity map, or the funnel. Do NOT use for the ranked candidate list — that's render_candidate_pool.",
     parameters: { type: "object", properties: {}, required: [] },
   },
   {

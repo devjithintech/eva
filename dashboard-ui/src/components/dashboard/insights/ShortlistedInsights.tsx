@@ -68,7 +68,7 @@ export function ShortlistedInsights() {
   const picks = matrix.data.rows
     .filter((r) => {
       const id = idByName.get(r.name);
-      const stage = id ? pipeline.data!.stages[id] ?? "scored" : "scored";
+      const stage = id ? pipeline.data!.stages[id] ?? "analyzed" : "analyzed";
       return stage === "shortlisted" || stage === "interview";
     })
     .filter((r) => r[sortKey] != null)

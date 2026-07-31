@@ -1,16 +1,23 @@
 /**
- * Peer Fit & Sim — mock dataset + renderer builders (D1-5/6/6b/7/7b/8/9/9b).
+ * Peer Fit & Sim — renderer builders (D1-5/6/6b/7/7b/8/9/9b).
  *
- * `data.json` has no pairwise fund-to-fund return series (see
- * `buildPeerCorrelation`'s comment in `candidates.ts`), so these numbers stay
- * illustrative — ported from what was previously
+ * D1-5/6/6b/7/7b/8 prefer the real precomputed panel for candidates with a
+ * completed analytics run (`data/panels.ts`), returned as-is — same pattern
+ * as `buildRendererData` uses for D1-1…D1-18. D1-9/D1-9b stay on the mock
+ * `simCompute` blend below (seeded with the candidate's real baseline via
+ * `resolveSubjectBase` when available) since the allocation slider and
+ * candidate-peer picker need to react live, which a static panel can't do.
+ *
+ * Absent a completed run, `data.json` has no pairwise fund-to-fund return
+ * series (see `buildPeerCorrelation`'s comment in `candidates.ts`), so these
+ * numbers stay illustrative — ported from what was previously
  * `dashboard-ui/src/components/peerfit/fixtures.ts` (client-side only, no
- * network calls). What changes here is the CONTRACT: every builder returns
- * the `{schema, rows, attrs, identity}` envelope + accepts the `RunParams`
- * shape described in FRONTEND_API_GUIDE_v6.pdf, so the frontend fetches this
- * data over HTTP instead of importing a fixtures module directly.
+ * network calls). Every builder returns the `{schema, rows, attrs, identity}`
+ * envelope + accepts the `RunParams` shape described in
+ * FRONTEND_API_GUIDE_v6.pdf.
  */
 import { resolveCandidateRecord, sec } from "./candidates.js";
+import { loadCandidatePanel } from "./panels.js";
 import type { Identity, RendererEnvelope, RunParams } from "../bff/types.js";
 
 /* ── Mock dataset (ported verbatim from fixtures.ts) ────────────────────── */
@@ -41,6 +48,7 @@ export interface CandPeer {
   short: string;
   fund: string;
   cand: string;
+  id: string;
   ret: number;
   vol: number;
   dd: number;
@@ -48,9 +56,9 @@ export interface CandPeer {
 }
 
 export const CAND_PEERS: CandPeer[] = [
-  { key: "reyes", short: "Reyes", fund: "Vega Market Neutral", cand: "Sofia Reyes", ret: 9.2, vol: 8.8, dd: -7.8, corr: 0.44 },
-  { key: "chen", short: "Chen", fund: "Aris Quant L/S", cand: "Marcus Chen", ret: 10.6, vol: 8.9, dd: -7.1, corr: 0.61 },
-  { key: "okafor", short: "Okafor", fund: "Meridian Stat Arb", cand: "David Okafor", ret: 8.1, vol: 8.5, dd: -8.4, corr: 0.58 },
+  { key: "reyes", short: "Reyes", fund: "Vega Market Neutral", cand: "Sofia Reyes", id: "C-2026-019", ret: 9.2, vol: 8.8, dd: -7.8, corr: 0.44 },
+  { key: "chen", short: "Chen", fund: "Aris Quant L/S", cand: "Marcus Chen", id: "C-2026-021", ret: 10.6, vol: 8.9, dd: -7.1, corr: 0.61 },
+  { key: "okafor", short: "Okafor", fund: "Meridian Stat Arb", cand: "David Okafor", id: "C-2026-027", ret: 8.1, vol: 8.5, dd: -8.4, corr: 0.58 },
 ];
 
 /** Deterministic pseudo-random correlation, seeded by row/col index — mirrors
@@ -201,6 +209,61 @@ function resolveCandidatePeers(params: RunParams): CandPeer[] {
   return CAND_PEERS.filter((c) => wanted.has(c.key) || wanted.has(c.fund));
 }
 
+/** Candidates with a completed analytics run (see `data/panels.ts`) have a
+ *  real D1-5 panel on disk. The Simulator (D1-9/D1-9b) still needs to react
+ *  live to the allocation slider and candidate-peer picker, which a static
+ *  panel can't do — so instead of returning the panel as-is, pull the
+ *  candidate's real Sharpe/return/vol/drawdown/correlation out of it and use
+ *  that as the blend input to `simCompute`, falling back to the mock
+ *  `SUBJECT_BASE` constant when no run exists. */
+function resolveSubjectBase(candidate: string): typeof SUBJECT_BASE {
+  const hit = resolveCandidateRecord(candidate);
+  const fundId = hit ? sec(hit.rec, "subject_fund").fund_id : undefined;
+  const panel = typeof fundId === "string" ? loadCandidatePanel(fundId, "D1-5") : null;
+  if (!panel) return SUBJECT_BASE;
+
+  const byMetric = new Map(panel.rows.map((r) => [r.metric as string, r.value as number]));
+  const ret = byMetric.get("annualised_return");
+  const vol = byMetric.get("annualised_vol");
+  const dd = byMetric.get("max_drawdown");
+  if (ret == null || vol == null || dd == null) return SUBJECT_BASE;
+
+  return {
+    ret: ret * 100,
+    vol: vol * 100,
+    dd: dd * 100,
+    sharpe: byMetric.get("sharpe") ?? SUBJECT_BASE.sharpe,
+    corr: (panel.attrs?.max_fund_correlation as number | undefined) ?? SUBJECT_BASE.corr,
+  };
+}
+
+/** Labels backed by a static precomputed panel (`candidate_panels/*.json`)
+ *  when a completed analytics run exists — returned as-is, matching
+ *  `buildRendererData`'s pattern for D1-1…D1-18. Excludes D1-9/D1-9b, which
+ *  stay on live `simCompute` (see `resolveSubjectBase`) so the Simulator's
+ *  slider and candidate-peer picker keep working. */
+const STATIC_PANEL_LABELS = new Set(["D1-5", "D1-6", "D1-6b", "D1-7", "D1-7b", "D1-8"]);
+
+function loadRealPanel(candidate: string, label: string): RendererEnvelope | null {
+  const hit = resolveCandidateRecord(candidate);
+  if (!hit) return null;
+  const sf = sec(hit.rec, "subject_fund");
+  const fundId = typeof sf.fund_id === "string" ? sf.fund_id : null;
+  if (!fundId) return null;
+  const panel = loadCandidatePanel(fundId, label);
+  if (!panel) return null;
+  return {
+    ...panel,
+    identity: {
+      scope: "Candidate",
+      fund_id: fundId,
+      fund_name: typeof sf.fund_name === "string" ? sf.fund_name : hit.name,
+      candidate_id: candidate,
+      pm_id: null,
+    },
+  };
+}
+
 function schemaOf(names: string[]): { name: string; type: string }[] {
   return names.map((n) => ({ name: n, type: "float" }));
 }
@@ -230,7 +293,7 @@ export function buildD15(candidate: string, params: RunParams): RendererEnvelope
   const candPeers = resolveCandidatePeers(params);
   const alloc = params.allocation_pct ?? 0.05;
   const cohort = candPeers.length
-    ? rankCohort(name, candPeers, alloc * 100)
+    ? rankCohort(name, identity, candPeers, alloc * 100, resolveSubjectBase(candidate))
     : undefined;
 
   const attrs: Record<string, unknown> = {
@@ -393,7 +456,7 @@ export function buildD18(candidate: string, params: RunParams): RendererEnvelope
 export function buildD19(candidate: string, params: RunParams): RendererEnvelope {
   const { name, identity } = buildIdentity(candidate);
   const alloc = (params.allocation_pct ?? 0.05) * 100;
-  const r = simCompute(alloc, SUBJECT_BASE);
+  const r = simCompute(alloc, resolveSubjectBase(candidate));
   const totalWeight = POOL_MEMBERS.reduce((a, m) => a + m[2], 0);
   const fmt = (v: number, digits = 1) => Math.round(v * 10 ** digits) / 10 ** digits;
 
@@ -427,6 +490,10 @@ export function buildD19(candidate: string, params: RunParams): RendererEnvelope
       allocation_pct: alloc / 100,
       benchmark: params.benchmark ?? "S&P 500 TR",
       risk_free: params.risk_free ?? "SP TBill 0-3M",
+      gross_exposure_pct: 124,
+      net_exposure_pct: 38,
+      kelly_multiplier_pct: 25,
+      stress_regime: "Normal",
     },
     identity,
   };
@@ -438,15 +505,20 @@ interface CohortRow {
   rank: number; fund_id: string; is_subject: boolean;
   dENS: number; dSharpe: number; max_pm_corr: number; penalty: boolean; fit_zone: string;
   // superset fields our Simulator UI needs beyond the guide's minimal schema:
-  short: string; ret: number; vol: number; sharpe: number; dd: number; ens: number; var: number;
+  short: string; fund_name: string; candidate_id: string; ret: number; vol: number; sharpe: number; dd: number; ens: number; var: number;
   dRet: number; dVol: number; dDD: number; dVaR: number;
   [key: string]: unknown;
 }
 
-function rankCohort(subjectName: string, candPeers: CandPeer[], allocPct: number): CohortRow[] {
+function rankCohort(subjectName: string, subjectIdentity: Identity, candPeers: CandPeer[], allocPct: number, subjectBase: typeof SUBJECT_BASE = SUBJECT_BASE): CohortRow[] {
+  const subjectShort = subjectName.split(/\s+/)[0].toUpperCase();
   const members = [
-    { key: "subject", short: subjectName, fund_id: subjectName, ...SUBJECT_BASE, isSubject: true },
-    ...candPeers.map((c) => ({ key: c.key, short: c.short, fund_id: c.key, ret: c.ret, vol: c.vol, dd: c.dd, corr: c.corr, isSubject: false })),
+    {
+      key: "subject", short: subjectShort, fund_id: subjectName,
+      fund_name: subjectIdentity.fund_name ?? subjectName, candidate_id: subjectIdentity.candidate_id ?? "—",
+      ...subjectBase, isSubject: true,
+    },
+    ...candPeers.map((c) => ({ key: c.key, short: c.short, fund_id: c.key, fund_name: c.fund, candidate_id: c.id, ret: c.ret, vol: c.vol, dd: c.dd, corr: c.corr, isSubject: false })),
   ];
   const scored = members.map((m) => ({ m, r: simCompute(allocPct, m) }));
   scored.sort((a, b) => b.r.dENS - a.r.dENS);
@@ -460,6 +532,8 @@ function rankCohort(subjectName: string, candPeers: CandPeer[], allocPct: number
     penalty: r.zone === "pen",
     fit_zone: FIT_ZONE[r.zone],
     short: m.short,
+    fund_name: m.fund_name,
+    candidate_id: m.candidate_id,
     ret: Math.round(r.ret * 10) / 10,
     vol: Math.round(r.vol * 10) / 10,
     sharpe: Math.round(r.sharpe * 100) / 100,
@@ -477,7 +551,7 @@ export function buildD19b(candidate: string, params: RunParams): RendererEnvelop
   const { name, identity } = buildIdentity(candidate);
   const candPeers = resolveCandidatePeers(params);
   const alloc = (params.allocation_pct ?? 0.05) * 100;
-  const cohort = rankCohort(name, candPeers, alloc);
+  const cohort = rankCohort(name, identity, candPeers, alloc, resolveSubjectBase(candidate));
   const best = cohort[0];
 
   return {
@@ -497,6 +571,10 @@ function rowSchema(names: string[]): { name: string; type: string }[] {
 export const PEERFIT_LABELS = new Set(["D1-5", "D1-6", "D1-6b", "D1-7", "D1-7b", "D1-8", "D1-9", "D1-9b"]);
 
 export function buildPeerFitRenderer(label: string, candidate: string, params: RunParams, extra: { source?: string } = {}): RendererEnvelope {
+  if (STATIC_PANEL_LABELS.has(label)) {
+    const real = loadRealPanel(candidate, label);
+    if (real) return real;
+  }
   switch (label) {
     case "D1-5": return buildD15(candidate, params);
     case "D1-6": return buildD16(candidate, params);

@@ -4,8 +4,6 @@ import { ErrorState } from "../components/common/ErrorState";
 import { FundHero } from "../components/detail/FundHero";
 import { SidebarNav, type NavSection } from "../components/detail/SidebarNav";
 import { ExecutiveSummarySection } from "../components/detail/ExecutiveSummarySection";
-import { PortfolioAnalysisSection } from "../components/detail/PortfolioAnalysisSection";
-import { RiskResearchSection } from "../components/detail/RiskResearchSection";
 import { AnalystFlagsSection } from "../components/detail/AnalystFlagsSection";
 import { OverviewSection } from "../components/detail/OverviewSection";
 import { PerformanceSection } from "../components/detail/PerformanceSection";
@@ -32,8 +30,6 @@ interface Props {
 
 const SECTIONS: NavSection[] = [
   { id: "summary", label: "Executive summary" },
-  { id: "portfolio", label: "Portfolio analysis" },
-  { id: "riskresearch", label: "Risk research" },
   { id: "flags", label: "Analyst flags" },
   { id: "overview", label: "Overview" },
   { id: "performance", label: "Performance" },
@@ -71,8 +67,6 @@ export function CandidateDetailPage({ id }: Props) {
         <SidebarNav sections={SECTIONS} moreSections={MORE_SECTIONS} />
         <main className="content">
           <ExecutiveSummarySection rec={rec} />
-          <PortfolioAnalysisSection />
-          <RiskResearchSection />
           <AnalystFlagsSection id={id} />
           <OverviewSection rec={rec} />
           <PerformanceSection rec={rec} />

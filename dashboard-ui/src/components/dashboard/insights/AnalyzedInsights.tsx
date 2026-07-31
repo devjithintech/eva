@@ -7,18 +7,18 @@ const POOL_GRAY = "#c7ccd4";
 
 interface Props {
   /** Saved Alpha range from the Preferences dialog — determines which
-   *  scored-but-unshortlisted candidates qualify (highlighted green) and the
+   *  analyzed-but-unshortlisted candidates qualify (highlighted green) and the
    *  bounding "Shortlist zone" drawn around them, instead of a fixed
    *  decorative rectangle. */
   alphaRange: PreferenceRange;
 }
 
-/** Real-data insights for the Scored tab: a CAGR-vs-drawdown "Selection Zone"
+/** Real-data insights for the Analyzed tab: a CAGR-vs-drawdown "Selection Zone"
  *  scatter (colored by pipeline stage, with a zone bounding candidates whose
  *  Alpha falls in the saved preference range) and a Pool Composition waffle
  *  chart, both sourced from `GET /opportunity-map` (the same builder the
  *  conversational agent's opportunity-map artifact uses). */
-export function ScoredInsights({ alphaRange }: Props) {
+export function AnalyzedInsights({ alphaRange }: Props) {
   const { data, loading } = useOpportunityMap();
 
   if (loading) return <LoadingState label="Loading insights…" />;
@@ -32,12 +32,12 @@ export function ScoredInsights({ alphaRange }: Props) {
   const x = (v: number) => L + ((v - cMin) / (cMax - cMin || 1)) * (R - L);
   const y = (v: number) => T + (1 - (v - dMin) / (dMax - dMin || 1)) * (B - T);
 
-  // "In alpha range": scored-but-unshortlisted candidates whose Alpha falls
+  // "In alpha range": analyzed-but-unshortlisted candidates whose Alpha falls
   // within the saved Preferences range — real qualification, not a fixed
   // top-N heuristic.
   const inRange = (p: (typeof data.points)[number]) => p.alpha != null && p.alpha >= alphaRange.lo && p.alpha <= alphaRange.hi;
-  const scoredPts = data.points.filter((p) => p.stage === "scored");
-  const qualifying = scoredPts.filter(inRange);
+  const analyzedPts = data.points.filter((p) => p.stage === "analyzed");
+  const qualifying = analyzedPts.filter(inRange);
   const qualifyingNames = new Set(qualifying.map((p) => p.name));
   const colorOf = (p: (typeof data.points)[number]) => {
     if (p.stage === "shortlisted" || p.stage === "interview") return "var(--primary)";
@@ -101,7 +101,7 @@ export function ScoredInsights({ alphaRange }: Props) {
             <circle cx={L + 144} cy={B + 22} r={5.5} fill={STRONG_GREEN} />
             <text x={L + 155} y={B + 26} fontSize="12" fill="var(--muted)">In alpha range</text>
             <circle cx={L + 316} cy={B + 22} r={5.5} fill={POOL_GRAY} />
-            <text x={L + 327} y={B + 26} fontSize="12" fill="var(--muted)">Scored pool</text>
+            <text x={L + 327} y={B + 26} fontSize="12" fill="var(--muted)">Analyzed pool</text>
           </svg>
         </div>
       </div>

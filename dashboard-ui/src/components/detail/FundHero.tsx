@@ -45,13 +45,10 @@ export function FundHero({ rec }: Props) {
           </button>
           <button type="button" className="btn" onClick={() => { window.location.hash = `#/candidates/${rec.id}/peer-fit`; }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="6" cy="6" r="3" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="18" cy="12" r="3" />
-              <path d="M8.6 7.5 15.4 10.5" />
-              <path d="M8.6 16.5 15.4 13.5" />
+              <path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z" />
+              <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
             </svg>
-            Peer fit &amp; Sim
+            Candidate Analytics
           </button>
           <button type="button" className="btn primary" disabled={saving || advanced} onClick={advance}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

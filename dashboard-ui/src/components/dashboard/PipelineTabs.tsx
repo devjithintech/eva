@@ -1,6 +1,9 @@
 import type { PipelineState, Stage } from "../../api/types";
 
-export type DashboardTab = Extract<Stage, "scored" | "shortlisted" | "interview">;
+export type DashboardTab = Extract<
+  Stage,
+  "analyzed" | "shortlisted" | "interview"
+>;
 
 interface Props {
   pipeline: PipelineState | null;
@@ -8,11 +11,11 @@ interface Props {
   onChange: (stage: DashboardTab) => void;
 }
 
-const TABS: { key: DashboardTab; label: string }[] = [
-  { key: "scored", label: "Scored" },
+const TABS = [
+  { key: "analyzed", label: "Analyzed" },
   { key: "shortlisted", label: "Shortlisted" },
   { key: "interview", label: "Interview" },
-];
+] as const satisfies { key: DashboardTab; label: string }[];
 
 export function PipelineTabs({ pipeline, active, onChange }: Props) {
   return (

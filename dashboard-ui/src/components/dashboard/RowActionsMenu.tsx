@@ -14,7 +14,7 @@ interface Props {
  *  for interview / Share this profile / Add a note / Reject Candidate) has
  *  no way to move a candidate into the intermediate "shortlisted" stage —
  *  only straight to "interview" — so the real 3-stage pipeline
- *  (scored → shortlisted → interview) could never actually populate its
+ *  (analyzed → shortlisted → interview) could never actually populate its
  *  Shortlisted tab. "Add to shortlist" fills that gap; the rest match the
  *  reference exactly. */
 export function RowActionsMenu({ showShortlist, showInterview, onShortlist, onSelectInterview, onShare, onAddNote, onReject }: Props) {

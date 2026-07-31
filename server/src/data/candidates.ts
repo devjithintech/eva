@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { funnelCounts, getStage } from "./pipeline.js";
+import { loadCandidatePanel } from "./panels.js";
 import type {
   AnalystFlagsPayload,
   Candidate,
@@ -82,6 +83,7 @@ export function resolveCandidateRecord(query: string): { name: string; rec: Reco
   const entries = Object.entries(loadDataset().candidates);
   const hit =
     entries.find(([name]) => slugify(name) === slugify(q) || name.toLowerCase() === q) ??
+    entries.find(([, rec]) => (rec.subject_fund as { fund_id?: string } | undefined)?.fund_id?.toLowerCase() === q) ??
     entries.find(([name, rec]) => {
       const fund = ((rec.subject_fund as { fund_name?: string } | undefined)?.fund_name ?? "").toLowerCase();
       return name.toLowerCase().includes(q) || q.includes(name.toLowerCase()) || fund.includes(q) || rec.pm_id === query;
@@ -259,7 +261,7 @@ export function buildCharacteristics(query = "anda-cruise"): CharacteristicsPayl
 /**
  * Dynamic opportunity map from `data.json` + the runtime pipeline:
  *  - scatter points = every candidate with both CAGR and max drawdown,
- *  - funnel (scored → shortlisted → interview) from the pipeline store,
+ *  - funnel (analyzed → shortlisted → interview) from the pipeline store,
  *  - pool = candidate count + total funds (each subject fund + its siblings).
  */
 export function buildOpportunityMap(): OpportunityMapPayload {
@@ -709,14 +711,39 @@ export const RENDERER_SECTIONS: Record<string, string[]> = {
  * Populate a renderer's response data from data.json. Per-fund renderers need a
  * `candidate` and return that fund's real section(s); D1-8 is pool-wide.
  * Returns null for labels we don't back yet.
+ *
+ * Some candidates have a completed analytics run on disk (real precomputed
+ * `{schema, rows, attrs}` panels — see `data/panels.ts`); when one covers the
+ * requested label, it's returned as-is (a real `RendererEnvelope`) instead of
+ * the raw data.json-section stub below. `panelKey` defaults to `label` but
+ * lets callers request an axis/kind/stress_model variant (e.g.
+ * "D1-10?axis=sector") since those are keyed literally in the panel files.
  */
-export function buildRendererData(label: string, candidateQuery?: string): unknown {
+export function buildRendererData(label: string, candidateQuery?: string, panelKey: string = label): unknown {
   if (label === "D1-8") return buildPeerCorrelation(candidateQuery);
+
+  const c = candidateQuery ? resolveCandidateRecord(candidateQuery) : null;
+
+  if (c) {
+    const sf = sec(c.rec, "subject_fund");
+    const fundId = typeof sf.fund_id === "string" ? sf.fund_id : null;
+    const panel = fundId ? loadCandidatePanel(fundId, panelKey) : null;
+    if (panel) {
+      return {
+        ...panel,
+        identity: {
+          scope: "Candidate",
+          fund_id: fundId,
+          fund_name: typeof sf.fund_name === "string" ? sf.fund_name : c.name,
+          candidate_id: typeof c.rec.pm_id === "string" ? c.rec.pm_id : null,
+          pm_id: typeof c.rec.pm_id === "string" ? c.rec.pm_id : null,
+        },
+      };
+    }
+  }
 
   const sections = RENDERER_SECTIONS[label];
   if (!sections) return null;
-
-  const c = candidateQuery ? resolveCandidateRecord(candidateQuery) : null;
   if (!c) {
     return { requiresCandidate: true, sections, note: "Pass ?candidate=<name|id> to populate this renderer from data.json." };
   }

@@ -1,4 +1,5 @@
 import { CONVERSATION_URL } from "../../lib/env";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 interface Props {
   chatOpen: boolean;
@@ -12,6 +13,7 @@ export function TopBar({ chatOpen, onToggleChat }: Props) {
     <div className="topbar">
       <div className="topbar-inner">
         <div className="brand">
+          <WorkspaceSwitcher />
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="26" height="26" role="img" aria-label="LightHouse">
             <defs>
               <clipPath id="lhClip">
@@ -31,18 +33,11 @@ export function TopBar({ chatOpen, onToggleChat }: Props) {
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input type="text" placeholder="Search candidates & funds" />
+          <input type="text" placeholder="Search" />
         </div>
         <div className="tb-right">
           <a className="mode-pill" href={CONVERSATION_URL}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-              <path d="M20 3v4" />
-              <path d="M22 5h-4" />
-              <path d="M4 17v2" />
-              <path d="M5 18H3" />
-            </svg>
-            EVA
+            Eva Assist
           </a>
           <button
             type="button"
