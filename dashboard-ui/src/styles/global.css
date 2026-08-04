@@ -644,6 +644,7 @@ table.data th {
   border-bottom: 1px solid var(--line);
   padding: 8px 12px 8px 0;
   font-weight: 700;
+  white-space: nowrap;
 }
 table.data th.r {
   text-align: right;

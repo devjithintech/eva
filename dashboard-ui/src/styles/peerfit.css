@@ -558,6 +558,17 @@
 .matrix th.cand-peer-cell {
   color: var(--teal);
 }
+.matrix th.unresolved {
+  color: var(--faint);
+  font-style: italic;
+}
+.matrix .no-name-flag {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  font-style: normal;
+  cursor: help;
+}
 
 /* simulator */
 .sim-shell {

@@ -25,6 +25,21 @@ export function MatrixView({ id, candidateName, params }: Props) {
     return "";
   };
 
+  // D1-8 sometimes has no display name for a fund (only an opaque numeric id
+  // made it through) — flag those instead of silently showing a bare number.
+  const isUnresolved = (name: string) => /^\d+$/.test(name);
+  const headerLabel = (name: string) =>
+    isUnresolved(name) ? (
+      <>
+        {name}
+        <span className="no-name-flag" title={`No display name available for fund id ${name}`}>
+          ⚠
+        </span>
+      </>
+    ) : (
+      name
+    );
+
   return (
     <div className="pl-view">
       <div className="pl-sh">
@@ -36,8 +51,12 @@ export function MatrixView({ id, candidateName, params }: Props) {
             <tr>
               <th className="corner">Fund</th>
               {names.map((n) => (
-                <th key={n} className={`col-h${n === candidateName ? " cand" : ""} ${cellClass(n, n)}`}>
-                  {n}
+                <th
+                  key={n}
+                  className={`col-h${n === candidateName ? " cand" : ""} ${cellClass(n, n)}${isUnresolved(n) ? " unresolved" : ""}`}
+                  title={n}
+                >
+                  {headerLabel(n)}
                 </th>
               ))}
             </tr>
@@ -47,7 +66,9 @@ export function MatrixView({ id, candidateName, params }: Props) {
               const rowName = String(row.index);
               return (
                 <tr key={rowName} className={rowName === candidateName ? "cand" : ""}>
-                  <th className="row-h">{rowName}</th>
+                  <th className={`row-h${isUnresolved(rowName) ? " unresolved" : ""}`} title={rowName}>
+                    {headerLabel(rowName)}
+                  </th>
                   {names.map((colName) => {
                     const value = row[colName] as number;
                     const isDiag = colName === rowName;
