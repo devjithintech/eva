@@ -254,7 +254,7 @@ export const openapi = {
   info: {
     title: "Candidate Intelligence — Renderer API",
     version: "0.1.0",
-    description: "Backend-for-frontend for the LightHouse web UI. Candidate data is served from `data.json`; peer / pipeline / run / audit endpoints are structural stubs.",
+    description: "Backend-for-frontend for the LightHouse web UI. Candidate data is served from SQL Server (dbo.Candidates; `data.json` is a fallback); peer / pipeline / run / audit endpoints are structural stubs.",
   },
   servers: [{ url: "/api", description: "BFF base path" }],
   tags: [

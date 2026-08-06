@@ -12,6 +12,11 @@ dotenv.config({ path: path.resolve(here, "../../.env") });
 
 export const config = {
   port: Number(process.env.PORT ?? 8787),
+  /** Optional API key protecting the BFF (`/api/*` data endpoints). Unset =
+   *  open (local dev). When set, callers must send it as `x-api-key` or
+   *  `Authorization: Bearer <key>` — this is the key to hand to consumers of
+   *  the candidate data, e.g. lh_ai_pm's LH_AI_PM_D1_API_KEY. */
+  d1ApiKey: process.env.D1_API_KEY ?? "",
   defaultModel: process.env.DEFAULT_MODEL ?? "groq-llama-3.3-70b",
   keys: {
     gemini: process.env.GEMINI_API_KEY ?? "",

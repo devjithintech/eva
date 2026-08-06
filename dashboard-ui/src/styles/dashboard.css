@@ -878,6 +878,41 @@
   gap: 12px;
   margin: 8px 0;
 }
+.cl-capactions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cl-search {
+  position: relative;
+}
+.cl-search svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--faint);
+  pointer-events: none;
+}
+.cl-search input {
+  width: 230px;
+  height: 32px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px 0 32px;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
+.cl-search input::placeholder {
+  color: var(--faint);
+}
+.cl-search input:focus {
+  border-color: #cdd2da;
+  box-shadow: 0 0 0 3px rgba(108, 92, 240, 0.08);
+}
 .cl-cap {
   font-size: 13px;
   color: var(--muted);

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useCandidatePeers, useRenderer } from "../../api/hooks";
+import { peerFundKeys, useCandidatePeers, useFundNames, useRenderer } from "../../api/hooks";
 import type { RunParams } from "../../api/types";
 import { LoadingState } from "../common/LoadingState";
 import { ErrorState } from "../common/ErrorState";
 
+/** D1-9 row — pool metric before/after adding the subject at the chosen
+ *  allocation. Values are raw fractions; `format` says how to render them
+ *  (".2%", ".2f", ".0%"). */
 interface SimRow {
   metric: string;
   label: string;
@@ -13,26 +16,27 @@ interface SimRow {
   format: string;
 }
 
+/** D1-9b row — one simulated candidate, ranked by fit. The service only
+ *  returns marginal-impact numbers (not per-candidate absolute metrics), and
+ *  `dSharpe` is null when a candidate has too little overlapping history. */
 interface CohortRow {
   rank: number;
   fund_id: string;
   is_subject: boolean;
-  short: string;
-  fund_name: string;
-  candidate_id: string;
-  ret: number;
-  vol: number;
-  sharpe: number;
-  dd: number;
-  ens: number;
-  var: number;
-  dRet: number;
-  dVol: number;
-  dSharpe: number;
-  dDD: number;
   dENS: number;
+  dSharpe: number | null;
   max_pm_corr: number;
+  penalty: boolean;
   fit_zone: "diversifying" | "approaching" | "penalty";
+}
+
+/** D1-9 `attrs.composition` entry — pool member weights (fractions of NAV,
+ *  levered, so they don't sum to 1). Numeric fund ids resolve to names via
+ *  the fund hierarchy. */
+interface CompositionEntry {
+  fund_id: string;
+  current_pct: number;
+  proposed_pct: number;
 }
 
 const ZONE_CHIP: Record<CohortRow["fit_zone"], string> = {
@@ -40,12 +44,6 @@ const ZONE_CHIP: Record<CohortRow["fit_zone"], string> = {
   approaching: "chip-app",
   penalty: "chip-pen",
 };
-
-interface PoolMember {
-  name: string;
-  description: string;
-  weight: number;
-}
 
 interface Props {
   id: string;
@@ -64,11 +62,27 @@ const PRESETS: { label: string; alloc: number }[] = [
 
 const POOL_COLORS = ["#9facd9", "#dc8e88", "#e4bd81", "#c2cd9c", "#90abb2", "#b7a1cc", "#d0c48a", "#8fbfae"];
 
+/** Render a raw metric value per the renderer's `format` hint. */
+function fmtValue(v: number | null | undefined, format: string): string {
+  if (v == null) return "—";
+  const m = /^\.(\d+)(%|f)$/.exec(format);
+  const digits = m ? Number(m[1]) : 2;
+  return m?.[2] === "%" ? `${(v * 100).toFixed(digits)}%` : v.toFixed(digits);
+}
+
+/** Owner/candidate prefix of a fund key (see candidateIdOf in api/hooks). */
+function ownerOf(fundId: string): string {
+  if (fundId.includes("::")) return fundId.split("::")[0];
+  if (fundId.includes("--")) return fundId.split("--")[0];
+  return fundId;
+}
+
 export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onOpenPoolDetail }: Props) {
   const [alloc, setAlloc] = useState(5);
   const [simInclude, setSimInclude] = useState<Set<string>>(new Set(selectedPeerKeys));
 
   const candidatePeers = useCandidatePeers();
+  const fundNames = useFundNames();
   const availablePeers = (candidatePeers.data ?? []).filter((c) => selectedPeerKeys.has(c.key));
 
   const peerKeysSig = Array.from(selectedPeerKeys).sort().join(",");
@@ -86,8 +100,8 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
     });
 
   const simParams = useMemo<RunParams>(
-    () => ({ ...params, allocation_pct: alloc / 100, candidate_peer_set: Array.from(simInclude) }),
-    [params, alloc, simInclude],
+    () => ({ ...params, allocation_pct: alloc / 100, candidate_peer_set: peerFundKeys(simInclude, candidatePeers.data) }),
+    [params, alloc, simInclude, candidatePeers.data],
   );
   const pool = useRenderer<SimRow>("D1-9", id, simParams);
   const cohort = useRenderer<CohortRow>("D1-9b", id, simParams);
@@ -98,20 +112,33 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
 
   const byMetric = new Map(pool.data.rows.map((r) => [r.metric, r]));
   const attrs = pool.data.attrs ?? {};
-  const poolMembers = (attrs.pool_members as PoolMember[]) ?? [];
-  const totalWeight = (attrs.pool_total_weight as number) ?? poolMembers.reduce((a, m) => a + m.weight, 0);
-  const grossExposure = (attrs.gross_exposure_pct as number) ?? 124;
-  const netExposure = (attrs.net_exposure_pct as number) ?? 38;
-  const kellyMultiplier = (attrs.kelly_multiplier_pct as number) ?? 25;
-  const stressRegime = (attrs.stress_regime as string) ?? "Normal";
+
+  // Pool composition — members with weight today (the subject enters at 0%).
+  const composition = ((attrs.composition as CompositionEntry[]) ?? []).filter((m) => m.current_pct > 0);
+  const totalWeight = composition.reduce((a, m) => a + m.current_pct, 0) || 1;
+  const poolMemberName = (fundId: string) => fundNames.nameById.get(fundId) ?? fundId;
+  const targetPoolName = fundNames.nameById.get(String(attrs.target_pool ?? "")) ?? "LH Diversified Fund";
+
+  // Lever readouts — fractions on the wire, percent on screen.
+  const grossExposure = ((attrs.gross_exposure as number) ?? 1.24) * 100;
+  const netExposure = ((attrs.net_exposure as number) ?? 0.38) * 100;
+  const kellyMultiplier = ((attrs.kelly_multiplier as number) ?? 0.25) * 100;
+  const stressRegime = (attrs.regime_selector as string) ?? "Normal";
 
   const results = cohort.data.rows;
+  if (results.length === 0) return <ErrorState message="Simulator returned no candidates" />;
   const best = results[0];
-  const subjectShort = results.find((x) => x.is_subject)?.short ?? candidateName;
   const penalizedCount = results.filter((x) => x.fit_zone === "penalty").length;
   const calloutClass = best.fit_zone === "penalty" ? " bad" : penalizedCount > 0 ? " warn" : "";
 
-  const d = (v: number, digits = 2, invertGood = false) => {
+  // Cohort rows carry only fund keys — display names come from the peer
+  // roster (candidate peers) or the candidate itself (subject).
+  const peerByFund = new Map((candidatePeers.data ?? []).map((c) => [c.analytics_fund_id ?? c.key, c]));
+  const shortOf = (x: CohortRow) => (x.is_subject ? candidateName : peerByFund.get(x.fund_id)?.short ?? ownerOf(x.fund_id));
+  const fundOf = (x: CohortRow) => peerByFund.get(x.fund_id)?.fund ?? (x.is_subject ? candidateName : x.fund_id);
+
+  const d = (v: number | null, digits = 2, invertGood = false) => {
+    if (v == null) return <span className="simx-d">—</span>;
     const good = invertGood ? v <= 0 : v >= 0;
     return (
       <span className={`simx-d ${Math.abs(v) < 0.005 ? "" : good ? "pos" : "neg"}`}>
@@ -158,7 +185,7 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
             <div className="sim-ctrl disabled">
               <div className="sim-ctrl-top">
                 <span className="sim-ctrl-lbl">Gross exposure</span>
-                <span className="sim-ctrl-val">{grossExposure}%</span>
+                <span className="sim-ctrl-val">{grossExposure.toFixed(0)}%</span>
               </div>
               <input type="range" min={80} max={200} step={2} value={grossExposure} disabled className="sim-slider" readOnly />
               <div className="sim-range">
@@ -169,7 +196,7 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
             <div className="sim-ctrl disabled">
               <div className="sim-ctrl-top">
                 <span className="sim-ctrl-lbl">Net exposure</span>
-                <span className="sim-ctrl-val">{netExposure}%</span>
+                <span className="sim-ctrl-val">{netExposure.toFixed(0)}%</span>
               </div>
               <input type="range" min={0} max={80} step={2} value={netExposure} disabled className="sim-slider" readOnly />
               <div className="sim-range">
@@ -180,12 +207,12 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
             <div className="sim-ctrl disabled">
               <div className="sim-ctrl-top">
                 <span className="sim-ctrl-lbl">Kelly multiplier</span>
-                <span className="sim-ctrl-val">{kellyMultiplier}%</span>
+                <span className="sim-ctrl-val">{kellyMultiplier.toFixed(0)}%</span>
               </div>
-              <input type="range" min={10} max={60} step={1} value={kellyMultiplier} disabled className="sim-slider" readOnly />
+              <input type="range" min={0} max={200} step={5} value={kellyMultiplier} disabled className="sim-slider" readOnly />
               <div className="sim-range">
-                <span>10%</span>
-                <span>60%</span>
+                <span>0%</span>
+                <span>200%</span>
               </div>
             </div>
             <div className="sim-ctrl disabled">
@@ -209,7 +236,7 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
               <span className="ccl">Include &amp; simulate</span>
               <span className="sim-inc-chip on subj">
                 <span className="ck" />
-                {subjectShort}
+                {candidateName}
               </span>
               {availablePeers.map((c) => {
                 const on = simInclude.has(c.key);
@@ -233,28 +260,29 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
                 <span>
                   Current pool —{" "}
                   <button type="button" className="pool-info-btn" onClick={onOpenPoolDetail} title="What is the current pool?">
-                    <span className="ig">i</span>LH Diversified Fund · {poolMembers.length} PMs
+                    <span className="ig">i</span>{targetPoolName} · {composition.length} PMs
                   </button>{" "}
                   <span className="pool-sub">(baseline · candidate-independent)</span>
                 </span>
                 <span style={{ color: "var(--muted)" }}>100%</span>
               </div>
               <div className="pool-bar">
-                {poolMembers.map((m, i) => (
+                {composition.map((m, i) => (
                   <div
-                    key={m.name}
+                    key={m.fund_id}
                     className="pool-seg"
-                    style={{ width: `${(m.weight / totalWeight) * 100}%`, background: POOL_COLORS[i % POOL_COLORS.length] }}
+                    style={{ width: `${(m.current_pct / totalWeight) * 100}%`, background: POOL_COLORS[i % POOL_COLORS.length] }}
+                    title={poolMemberName(m.fund_id)}
                   >
-                    {((m.weight / totalWeight) * 100).toFixed(0)}%
+                    {((m.current_pct / totalWeight) * 100).toFixed(0)}%
                   </div>
                 ))}
               </div>
               <div className="pool-legend">
-                {poolMembers.map((m, i) => (
-                  <span key={m.name}>
+                {composition.map((m, i) => (
+                  <span key={m.fund_id}>
                     <span className="pool-legend-dot" style={{ background: POOL_COLORS[i % POOL_COLORS.length] }} />
-                    {m.name}
+                    {poolMemberName(m.fund_id)}
                   </span>
                 ))}
               </div>
@@ -266,9 +294,9 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
                   <tr>
                     <th>Marginal impact at {alloc.toFixed(1)}%</th>
                     <th>Current pool</th>
-                    {results.map((x, i) => (
+                    {results.map((x) => (
                       <th key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        #{i + 1} {x.short}
+                        #{x.rank} {shortOf(x)}
                       </th>
                     ))}
                   </tr>
@@ -279,7 +307,7 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
                     <td>—</td>
                     {results.map((x) => (
                       <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.fund_name}
+                        {fundOf(x)}
                       </td>
                     ))}
                   </tr>
@@ -288,52 +316,25 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
                     <td>—</td>
                     {results.map((x) => (
                       <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.candidate_id}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr>
-                    <td>Ann. return</td>
-                    <td>+{(byMetric.get("annualised_return")?.current ?? 0).toFixed(1)}%</td>
-                    {results.map((x) => (
-                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {(x.ret >= 0 ? "+" : "") + x.ret.toFixed(1)}% {d(x.dRet, 2)}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr>
-                    <td>Ann. volatility</td>
-                    <td>{(byMetric.get("annualised_vol")?.current ?? 0).toFixed(1)}%</td>
-                    {results.map((x) => (
-                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.vol.toFixed(1)}% {d(x.dVol, 2, true)}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr>
-                    <td>Sharpe</td>
-                    <td>{(byMetric.get("sharpe")?.current ?? 0).toFixed(2)}</td>
-                    {results.map((x) => (
-                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.sharpe.toFixed(2)} {d(x.dSharpe, 2)}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr>
-                    <td>Max drawdown</td>
-                    <td>{(byMetric.get("max_drawdown")?.current ?? 0).toFixed(1)}%</td>
-                    {results.map((x) => (
-                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.dd.toFixed(1)}% {d(x.dDD, 2)}
+                        {ownerOf(x.fund_id)}
                       </td>
                     ))}
                   </tr>
                   <tr>
                     <td>Effective N (ENS)</td>
-                    <td>{(byMetric.get("ens")?.current ?? 0).toFixed(1)}</td>
+                    <td>{fmtValue(byMetric.get("ens")?.current, byMetric.get("ens")?.format ?? ".2f")}</td>
                     {results.map((x) => (
                       <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
-                        {x.ens.toFixed(1)} {d(x.dENS, 2)}
+                        {d(x.dENS, 2)}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td>Sharpe</td>
+                    <td>{fmtValue(byMetric.get("sharpe")?.current, byMetric.get("sharpe")?.format ?? ".2f")}</td>
+                    {results.map((x) => (
+                      <td key={x.fund_id} className={x.is_subject ? "subj" : ""}>
+                        {d(x.dSharpe, 2)}
                       </td>
                     ))}
                   </tr>
@@ -359,6 +360,36 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
               </table>
             </div>
 
+            {/* Pool impact — the subject's before/after on every D1-9 metric.
+                Per-candidate absolute metrics aren't served by D1-9b, so this
+                table is subject-only. */}
+            <div className="sim-mc">
+              <table className="simx-tbl">
+                <thead>
+                  <tr>
+                    <th>Pool impact — {candidateName} at {alloc.toFixed(1)}%</th>
+                    <th>Current</th>
+                    <th>Proposed</th>
+                    <th>Δ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pool.data.rows.map((r) => (
+                    <tr key={r.metric}>
+                      <td>{r.label}</td>
+                      <td>{fmtValue(r.current, r.format)}</td>
+                      <td>{fmtValue(r.proposed, r.format)}</td>
+                      <td>
+                        <span className={`simx-d ${Math.abs(r.delta) < 1e-9 ? "" : r.delta >= 0 ? "pos" : "neg"}`}>
+                          {(r.delta >= 0 ? "+" : "") + fmtValue(r.delta, r.format)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <div className={`sim-callout${calloutClass}`}>
               {best.fit_zone === "penalty" ? (
                 <>
@@ -369,10 +400,11 @@ export function SimulatorView({ id, candidateName, params, selectedPeerKeys, onO
                 </>
               ) : (
                 <>
-                  <strong>Best fit — {best.short}</strong> at {alloc.toFixed(1)}% into Lighthouse Diversified: ENS Δ{" "}
+                  <strong>Best fit — {shortOf(best)}</strong> at {alloc.toFixed(1)}% into {targetPoolName}: ENS Δ{" "}
                   {best.dENS >= 0 ? "+" : ""}
-                  {best.dENS.toFixed(2)}, Sharpe Δ {best.dSharpe >= 0 ? "+" : ""}
-                  {best.dSharpe.toFixed(2)}, max pool corr {best.max_pm_corr.toFixed(2)}. {results.length} candidate
+                  {best.dENS.toFixed(2)}, Sharpe Δ{" "}
+                  {best.dSharpe == null ? "n/a" : (best.dSharpe >= 0 ? "+" : "") + best.dSharpe.toFixed(2)}, max pool corr{" "}
+                  {best.max_pm_corr.toFixed(2)}. {results.length} candidate
                   {results.length === 1 ? "" : "s"} simulated under identical levers
                   {penalizedCount > 0 ? ` · ${penalizedCount} hit the 0.60 penalty` : ""}.
                 </>

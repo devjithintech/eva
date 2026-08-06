@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { DataNotFound, readJson } from "./store.js";
+import { DataNotFound } from "./store.js";
 import { RENDERERS, RENDERER_BY_LABEL } from "./renderers.js";
 import { openapi } from "./openapi.js";
 import {
@@ -14,6 +14,7 @@ import {
   regionTags,
   strategyLabel,
 } from "../data/candidates.js";
+import { getDataset } from "../data/sqlDataset.js";
 import { allStages, funnelCounts, getStage, setStage, type Stage } from "../data/pipeline.js";
 import { CAND_PEERS, PEERFIT_LABELS, PEER_GROUPS, SAVED_GROUPS, buildPeerFitRenderer } from "../data/peerfit.js";
 import {
@@ -29,7 +30,8 @@ import type { CandidateRecord, CandidateSummary, Dataset, RunParams } from "./ty
 
 /**
  * Backend-for-frontend, mounted at `/api`. Paths + descriptions mirror the
- * Renderer API catalog. Candidate endpoints are backed by `data.json`; peer /
+ * Renderer API catalog. Candidate endpoints are backed by SQL Server
+ * (dbo.Candidates, via `data/sqlDataset.ts`; `data.json` is a fallback); peer /
  * pipeline / run / audit endpoints are structural stubs (fill in later).
  */
 export const bff = Router();
@@ -37,7 +39,9 @@ export const bff = Router();
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-const dataset = () => readJson<Dataset>("data");
+/** SQL-backed candidate dataset (dbo.Candidates via `data/sqlDataset.ts`) —
+ *  same `{count, candidates}` shape the old data.json file had. */
+const dataset = () => getDataset() as Dataset;
 
 function summarize(name: string, rec: CandidateRecord): CandidateSummary {
   return {

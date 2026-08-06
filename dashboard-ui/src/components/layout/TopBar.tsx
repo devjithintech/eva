@@ -4,11 +4,14 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 interface Props {
   chatOpen: boolean;
   onToggleChat: () => void;
+  /** Global search query — filters the candidate dashboard (see App). */
+  search: string;
+  onSearch: (q: string) => void;
 }
 
 /** Shared top bar — ported from the LightHouse design reference's identical
  *  topbar markup across candidates.html/detail.html/peerandfit.html. */
-export function TopBar({ chatOpen, onToggleChat }: Props) {
+export function TopBar({ chatOpen, onToggleChat, search, onSearch }: Props) {
   return (
     <div className="topbar">
       <div className="topbar-inner">
@@ -33,7 +36,13 @@ export function TopBar({ chatOpen, onToggleChat }: Props) {
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input type="text" placeholder="Search" />
+          <input
+            type="search"
+            placeholder="Search"
+            aria-label="Search candidates"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+          />
         </div>
         <div className="tb-right">
           <a className="mode-pill" href={CONVERSATION_URL}>

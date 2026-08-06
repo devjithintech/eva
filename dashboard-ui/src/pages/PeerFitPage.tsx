@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { useCandidate } from "../api/hooks";
+import { peerFundKeys, useCandidate, useCandidatePeers, usePeerGroups, useRenderer } from "../api/hooks";
+import { RENDERERS_FUND_ID } from "../api/client";
+import { firstSection } from "../api/sections";
 import type { RunParams } from "../api/types";
 import { LoadingState } from "../components/common/LoadingState";
 import { ErrorState } from "../components/common/ErrorState";
@@ -9,11 +11,12 @@ import { PortfolioAnalysisSection } from "../components/detail/PortfolioAnalysis
 import { RiskResearchSection } from "../components/detail/RiskResearchSection";
 import { SnapshotView } from "../components/peerfit/SnapshotView";
 import { PeerTableView } from "../components/peerfit/PeerTableView";
-import { CorrelationsView } from "../components/peerfit/CorrelationsView";
+import { CorrelationsView, type CorrRow } from "../components/peerfit/CorrelationsView";
 import { MatrixView } from "../components/peerfit/MatrixView";
 import { SimulatorView } from "../components/peerfit/SimulatorView";
 import { ConfigureComparisonModal, type ConfigTab } from "../components/peerfit/ConfigureComparisonModal";
 import { WindowModal, type AnalysisWindow } from "../components/peerfit/WindowModal";
+import { CANDIDATE_FILTER_STORAGE_KEY } from "../components/dashboard/CandidateFilterDialog";
 import { PoolDetailModal } from "../components/peerfit/PoolDetailModal";
 
 interface Props {
@@ -68,15 +71,49 @@ const TABS: { key: SubTab; label: string }[] = [
 ];
 
 const DEFAULT_WINDOW: AnalysisWindow = { from: "2022-11", to: "2025-11" };
-const DEFAULT_BENCHMARK = "S&P 500 TR";
-const DEFAULT_RISK_FREE = "SP TBill 0-3M";
+const DEFAULT_BENCHMARK = "S&P 500 TR Index";
+
+/** Benchmark default — the Index filter picked on the candidate dashboard
+ *  (persisted per browser-tab session under CANDIDATE_FILTER_STORAGE_KEY),
+ *  falling back to the S&P 500 TR default when none is set. "S&P 500" maps
+ *  onto the total-return series name the renderers service defaults to. */
+function dashboardBenchmark(): string {
+  try {
+    const raw = sessionStorage.getItem(CANDIDATE_FILTER_STORAGE_KEY);
+    const index = raw ? (JSON.parse(raw) as { index?: string | null }).index : null;
+    if (!index) return DEFAULT_BENCHMARK;
+    return index === "S&P 500" ? DEFAULT_BENCHMARK : index;
+  } catch {
+    return DEFAULT_BENCHMARK;
+  }
+}
+const DEFAULT_RISK_FREE = "SP T-Bill 0-3M Index TR";
 const DEFAULT_PEER_GROUP = "China Onshore Quant MN";
+
+/** Fund key sent to the renderers service — dynamic per selected candidate,
+ *  from the candidate record (the candidate list data). Precedence: an
+ *  explicit service key stamped on the record
+ *  (`subject_fund.analytics_fund_id`), else the record's own
+ *  `subject_fund.fund_id`; the configured fund (VITE_RENDERERS_FUND_ID) is a
+ *  last resort for records with no fund id at all. */
+function rendererFundIdFor(sf: Record<string, unknown>): string {
+  if (typeof sf.analytics_fund_id === "string" && sf.analytics_fund_id) return sf.analytics_fund_id;
+  if (typeof sf.fund_id === "string" && sf.fund_id) return sf.fund_id;
+  return RENDERERS_FUND_ID;
+}
 
 function fmtWindow(w: AnalysisWindow): string {
   const [fy, fm] = w.from.split("-");
   const [ty, tm] = w.to.split("-");
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${months[Number(fm) - 1]}-${fy.slice(2)} – ${months[Number(tm) - 1]}-${ty.slice(2)}`;
+}
+
+/** "2022-11" → "2022-11-30" — the renderers service anchors window bounds on
+ *  month-end dates (monthly return series are dated at month end). */
+function monthEnd(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
 }
 
 export function PeerFitPage({ id }: Props) {
@@ -91,33 +128,58 @@ export function PeerFitPage({ id }: Props) {
   };
 
   const [win, setWin] = useState<AnalysisWindow>(DEFAULT_WINDOW);
-  const [benchmark, setBenchmark] = useState(DEFAULT_BENCHMARK);
+  // Resolved once per mount — what the benchmark chip resets back to.
+  const defaultBenchmark = useMemo(dashboardBenchmark, []);
+  const [benchmark, setBenchmark] = useState(defaultBenchmark);
   const [riskFree, setRiskFree] = useState(DEFAULT_RISK_FREE);
-  const [peerGroup, setPeerGroup] = useState(DEFAULT_PEER_GROUP);
-  const [peerUniverseOn, setPeerUniverseOn] = useState(true);
+  // No peer-group filter by default (null) — the renderers service then uses
+  // its default established universe. A chip appears once a group is picked
+  // in the configure dialog; its × clears back to the unfiltered default.
+  const [peerGroup, setPeerGroup] = useState<string | null>(null);
   const [selectedPeerKeys, setSelectedPeerKeys] = useState<Set<string>>(new Set());
 
+  const { data: peerRoster } = useCandidatePeers();
   const params: RunParams = useMemo(
     () => ({
       benchmark,
       risk_free: riskFree,
-      window_start: `${win.from}-01`,
-      window_end: `${win.to}-01`,
-      ...(peerUniverseOn ? { peer_group: peerGroup } : { include_peer_universe: false }),
-      ...(selectedPeerKeys.size ? { candidate_peer_set: Array.from(selectedPeerKeys) } : {}),
+      window_start: monthEnd(win.from),
+      window_end: monthEnd(win.to),
+      datasets: ["lh_internal", "bloomberg"],
+      ...(peerGroup ? { peer_group: peerGroup } : {}),
+      ...(selectedPeerKeys.size ? { candidate_peer_set: peerFundKeys(selectedPeerKeys, peerRoster) } : {}),
     }),
-    [benchmark, riskFree, win, peerUniverseOn, peerGroup, selectedPeerKeys],
+    [benchmark, riskFree, win, peerGroup, selectedPeerKeys, peerRoster],
   );
+
+  // Fetched at page level (not inside CorrelationsView) so the Correlations
+  // subtab badge shows its pair count without a duplicate request. Skipped
+  // (null) until the candidate record resolves the renderer fund key.
+  const fundId = rec ? rendererFundIdFor(firstSection(rec, "subject_fund")) : null;
+  const corr = useRenderer<CorrRow>("D1-7", fundId, params);
+  const { data: peerGroups } = usePeerGroups();
 
   if (loading) return <div className="container"><LoadingState label="Loading candidate…" /></div>;
   if (error || !rec) return <div className="container"><ErrorState message={error ?? "Candidate not found"} /></div>;
 
+  // Subject identity for the config modal's Candidate-peers tab — manager ·
+  // cand id · fund id, mirroring the peer rows' meta line.
+  const mgr = firstSection(rec, "manager");
+  const sf = firstSection(rec, "subject_fund");
+  const subject = {
+    fund: (typeof sf.fund_name === "string" && sf.fund_name) || rec.name,
+    manager: typeof mgr.pm_name === "string" ? mgr.pm_name : null,
+    candId: rec.pm_id ?? rec.id ?? null,
+    fundId: typeof sf.fund_id === "string" ? sf.fund_id : null,
+  };
+  // Non-null now that `rec` is guarded — the id every renderer call uses.
+  const rendererId = rendererFundIdFor(sf);
+
   const resetAll = () => {
     setWin(DEFAULT_WINDOW);
-    setBenchmark(DEFAULT_BENCHMARK);
+    setBenchmark(defaultBenchmark);
     setRiskFree(DEFAULT_RISK_FREE);
-    setPeerGroup(DEFAULT_PEER_GROUP);
-    setPeerUniverseOn(true);
+    setPeerGroup(null);
     setSelectedPeerKeys(new Set());
   };
 
@@ -147,8 +209,8 @@ export function PeerFitPage({ id }: Props) {
         ))}
       </div>
 
-      {topTab === "portfolio" && <PortfolioAnalysisSection id={id} />}
-      {topTab === "risk" && <RiskResearchSection id={id} />}
+      {topTab === "portfolio" && <PortfolioAnalysisSection id={rendererId} />}
+      {topTab === "risk" && <RiskResearchSection id={rendererId} />}
       {topTab === "peerfit" && (
         <>
           <div className="fchips">
@@ -158,7 +220,7 @@ export function PeerFitPage({ id }: Props) {
                 className="fchip-x"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setBenchmark(DEFAULT_BENCHMARK);
+                  setBenchmark(defaultBenchmark);
                 }}
                 title="Remove"
                 aria-label="Remove benchmark filter"
@@ -166,14 +228,14 @@ export function PeerFitPage({ id }: Props) {
                 ×
               </span>
             </button>
-            {peerUniverseOn && (
+            {peerGroup != null && (
               <button className="fchip" onClick={() => openConfig("groups")} title="Established peer universe — click to configure">
                 Peer Universe : <span>{peerGroup}</span>
                 <span
                   className="fchip-x"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setPeerUniverseOn(false);
+                    setPeerGroup(null);
                   }}
                   title="Remove"
                   aria-label="Remove peer universe filter"
@@ -198,20 +260,22 @@ export function PeerFitPage({ id }: Props) {
                 </span>
               </button>
             )}
-            <button className="fchip" onClick={() => openConfig("groups")} title="Click to change risk-free rate">
-              Risk-free : <span>{riskFree}</span>
-              <span
-                className="fchip-x"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRiskFree(DEFAULT_RISK_FREE);
-                }}
-                title="Remove"
-                aria-label="Remove risk-free filter"
-              >
-                ×
-              </span>
-            </button>
+            {riskFree !== DEFAULT_RISK_FREE && (
+              <button className="fchip" onClick={() => openConfig("groups")} title="Click to change risk-free rate">
+                Risk-free : <span>{riskFree}</span>
+                <span
+                  className="fchip-x"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRiskFree(DEFAULT_RISK_FREE);
+                  }}
+                  title="Remove"
+                  aria-label="Remove risk-free filter"
+                >
+                  ×
+                </span>
+              </button>
+            )}
             <button className="fchips-reset" onClick={resetAll}>
               Reset
             </button>
@@ -242,26 +306,40 @@ export function PeerFitPage({ id }: Props) {
           </div>
 
           <div className="pl-subtabs">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`pl-subtab${tab === t.key ? " active" : ""}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
+            {TABS.map((t) => {
+              const peerGroupCount = peerGroup ? peerGroups?.find((g) => g.name === peerGroup)?.count : undefined;
+              const badge: number | undefined =
+                t.key === "peers"
+                  ? peerGroupCount != null
+                    ? peerGroupCount + selectedPeerKeys.size
+                    : undefined
+                  : t.key === "correlations" && corr.data
+                    ? corr.data.rows.length + selectedPeerKeys.size
+                    : undefined;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  className={`pl-subtab${tab === t.key ? " active" : ""}`}
+                  onClick={() => setTab(t.key)}
+                >
+                  {t.label}
+                  {badge != null && <span className="pl-num">{badge}</span>}
+                </button>
+              );
+            })}
           </div>
 
           {tab === "snapshot" && (
-            <SnapshotView id={id} candidateName={rec.name} params={params} selectedPeerKeys={selectedPeerKeys} onAddPeers={() => openConfig("candidates")} />
+            <SnapshotView id={rendererId} candidateName={rec.name} params={params} selectedPeerKeys={selectedPeerKeys} onAddPeers={() => openConfig("candidates")} />
           )}
-          {tab === "peers" && <PeerTableView id={id} candidateName={rec.name} params={params} onOpenCandidates={() => openConfig("candidates")} />}
-          {tab === "correlations" && <CorrelationsView id={id} candidateName={rec.name} params={params} />}
-          {tab === "matrix" && <MatrixView id={id} candidateName={rec.name} params={params} />}
+          {tab === "peers" && <PeerTableView id={rendererId} candidateName={rec.name} params={params} onOpenCandidates={() => openConfig("candidates")} />}
+          {tab === "correlations" && (
+            <CorrelationsView id={rendererId} candidateName={rec.name} params={params} corr={corr} onOpenCandidates={() => openConfig("candidates")} />
+          )}
+          {tab === "matrix" && <MatrixView id={rendererId} candidateName={rec.name} params={params} onOpenCandidates={() => openConfig("candidates")} />}
           {tab === "simulator" && (
-            <SimulatorView id={id} candidateName={rec.name} params={params} selectedPeerKeys={selectedPeerKeys} onOpenPoolDetail={() => setOpenModal("pool")} />
+            <SimulatorView id={rendererId} candidateName={rec.name} params={params} selectedPeerKeys={selectedPeerKeys} onOpenPoolDetail={() => setOpenModal("pool")} />
           )}
 
           <p className="pf-footnote">
@@ -278,17 +356,17 @@ export function PeerFitPage({ id }: Props) {
       <ConfigureComparisonModal
         open={openModal === "config"}
         onClose={() => setOpenModal(null)}
-        peerGroupName={peerGroup}
+        peerGroupName={peerGroup ?? DEFAULT_PEER_GROUP}
         selectedPeerKeys={selectedPeerKeys}
+        subject={subject}
         initialTab={configTab}
         onApply={(group, peers) => {
           setPeerGroup(group);
-          setPeerUniverseOn(true);
           setSelectedPeerKeys(peers);
         }}
       />
       <WindowModal open={openModal === "window"} onClose={() => setOpenModal(null)} value={win} onApply={setWin} />
-      <PoolDetailModal open={openModal === "pool"} onClose={() => setOpenModal(null)} id={id} params={params} />
+      <PoolDetailModal open={openModal === "pool"} onClose={() => setOpenModal(null)} id={rendererId} params={params} />
     </div>
   );
 }

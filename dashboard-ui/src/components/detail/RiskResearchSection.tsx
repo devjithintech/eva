@@ -201,22 +201,29 @@ function StressGraph({ rows }: { rows: { name: string; delta: number }[] }) {
 export function RiskResearchSection({ id }: Props) {
   const [stressView, setStressView] = useState<"graph" | "list">("graph");
 
+  // D1-15 doubles as the probe for whether this candidate has a completed
+  // analytics run at all — most don't. The other 15 panels skip their fetch
+  // (null fund id) until it confirms a run, so the common no-run case costs
+  // one request instead of sixteen.
   const portfolioRisk = useRenderer<MetricRow>("D1-15", id);
-  const exposure = useRenderer<ExposureRow>("D1-13", id);
-  const concentration = useRenderer<ConcentrationRow>("D1-14", id);
-  const liquidity = useRenderer<LiquidityRow>("D1-17", id);
-  const byClass = useRenderer<ClassRow>("D1-12", id, undefined, { axis: "by_class" });
-  const byFactor = useRenderer<FactorDecompRow>("D1-12", id, undefined, { axis: "by_factor" });
-  const sector = useRenderer<CategoryRow>("D1-10", id, undefined, { axis: "sector" });
-  const industry = useRenderer<CategoryRow>("D1-10", id, undefined, { axis: "industry" });
-  const country = useRenderer<CategoryRow>("D1-10", id, undefined, { axis: "country" });
-  const market = useRenderer<CategoryRow>("D1-18", id);
-  const largestRisk = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "largest_by_risk" });
-  const smallestRisk = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "smallest_by_risk" });
-  const largestNotional = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "largest_by_notional" });
-  const smallestNotional = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "smallest_by_notional" });
-  const leastLiquid = useRenderer<PositionRow>("D1-11", id, undefined, { kind: "least_liquid" });
-  const stress = useRenderer<StressRow>("D1-16", id);
+  const hasRun = Array.isArray(portfolioRisk.data?.rows) && portfolioRisk.data.rows.length > 0;
+  const runId = hasRun ? id : null;
+
+  const exposure = useRenderer<ExposureRow>("D1-13", runId);
+  const concentration = useRenderer<ConcentrationRow>("D1-14", runId);
+  const liquidity = useRenderer<LiquidityRow>("D1-17", runId);
+  const byClass = useRenderer<ClassRow>("D1-12", runId, undefined, { axis: "by_class" });
+  const byFactor = useRenderer<FactorDecompRow>("D1-12", runId, undefined, { axis: "by_factor" });
+  const sector = useRenderer<CategoryRow>("D1-10", runId, undefined, { axis: "sector" });
+  const industry = useRenderer<CategoryRow>("D1-10", runId, undefined, { axis: "industry" });
+  const country = useRenderer<CategoryRow>("D1-10", runId, undefined, { axis: "country" });
+  const market = useRenderer<CategoryRow>("D1-18", runId);
+  const largestRisk = useRenderer<PositionRow>("D1-11", runId, undefined, { kind: "largest_by_risk" });
+  const smallestRisk = useRenderer<PositionRow>("D1-11", runId, undefined, { kind: "smallest_by_risk" });
+  const largestNotional = useRenderer<PositionRow>("D1-11", runId, undefined, { kind: "largest_by_notional" });
+  const smallestNotional = useRenderer<PositionRow>("D1-11", runId, undefined, { kind: "smallest_by_notional" });
+  const leastLiquid = useRenderer<PositionRow>("D1-11", runId, undefined, { kind: "least_liquid" });
+  const stress = useRenderer<StressRow>("D1-16", runId);
 
   const resources = [
     portfolioRisk, exposure, concentration, liquidity, byClass, byFactor,
@@ -240,7 +247,6 @@ export function RiskResearchSection({ id }: Props) {
     );
   }
 
-  const hasRun = Array.isArray(portfolioRisk.data?.rows) && portfolioRisk.data!.rows.length > 0;
   if (!hasRun) {
     return (
       <div id="risk" className="sec-body">

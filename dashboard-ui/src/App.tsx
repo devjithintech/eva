@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageLoader } from "./components/common/PageLoader";
 import { TopBar } from "./components/layout/TopBar";
 import { ChatDrawer } from "./components/layout/ChatDrawer";
 import { CandidatesPage } from "./pages/CandidatesPage";
@@ -35,12 +36,16 @@ function useHashRoute(): Route {
 export function App() {
   const route = useHashRoute();
   const [chatOpen, setChatOpen] = useState(true);
+  // Global candidate search — one query shared by the top bar and the
+  // dashboard's table search box, so typing in either filters the table.
+  const [search, setSearch] = useState("");
 
   return (
     <>
-      <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen((v) => !v)} />
+      <PageLoader />
+      <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen((v) => !v)} search={search} onSearch={setSearch} />
       <div id="pageWrap">
-        {route.name === "candidates" && <CandidatesPage />}
+        {route.name === "candidates" && <CandidatesPage search={search} />}
         {route.name === "detail" && <CandidateDetailPage id={route.id} />}
         {route.name === "peer-fit" && <PeerFitPage id={route.id} />}
       </div>

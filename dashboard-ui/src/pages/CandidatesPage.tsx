@@ -7,6 +7,7 @@ import {
 } from "../api/hooks";
 import type { CandidateSummary, Stage } from "../api/types";
 import { matchesPreferences } from "../lib/preferences";
+import { useSessionState } from "../lib/useSessionState";
 import { Breadcrumbs } from "../components/layout/Breadcrumbs";
 import {
   PipelineTabs,
@@ -27,6 +28,7 @@ import {
 } from "../components/dashboard/PreferenceDialog";
 import {
   CandidateFilterDialog,
+  CANDIDATE_FILTER_STORAGE_KEY,
   EMPTY_FILTER,
   type CandidateFilterState,
 } from "../components/dashboard/CandidateFilterDialog";
@@ -166,7 +168,12 @@ const FACTOR_METRICS: PreferenceMetric[] = [
   },
 ];
 
-export function CandidatesPage() {
+interface Props {
+  /** Search query from the top bar (see App) — filters the table. */
+  search: string;
+}
+
+export function CandidatesPage({ search }: Props) {
   const matrix = useCandidateMatrix(true);
   const candidates = useCandidates();
   const pipeline = usePipeline();
@@ -179,11 +186,24 @@ export function CandidatesPage() {
   const [view, setView] = useState<"dashboard" | "compare">("dashboard");
   const [prefOpen, setPrefOpen] = useState(false);
   const [factorOpen, setFactorOpen] = useState(false);
-  const [alphaRange, setAlphaRange] =
-    useState<PreferenceRange>(DEFAULT_ALPHA_RANGE);
-  const [prefValues, setPrefValues] = useState<PreferenceValues | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filter, setFilter] = useState<CandidateFilterState>(EMPTY_FILTER);
+  // Filters & preferences persist for the browser-tab session, so they
+  // survive navigating to a candidate detail and back (or a reload).
+  const [alphaRange, setAlphaRange] = useSessionState<PreferenceRange>(
+    "candidates.alphaRange",
+    DEFAULT_ALPHA_RANGE,
+  );
+  const [prefValues, setPrefValues] = useSessionState<PreferenceValues | null>(
+    "candidates.preferences",
+    null,
+  );
+  const [filter, setFilter] = useSessionState<CandidateFilterState>(
+    CANDIDATE_FILTER_STORAGE_KEY,
+    EMPTY_FILTER,
+    // Merge over defaults so a value stored by an older build (missing a
+    // field) can't crash `.strategy.length` etc.
+    (stored) => ({ ...EMPTY_FILTER, ...(stored as Partial<CandidateFilterState>) }),
+  );
 
   const nameToId = useMemo(() => {
     const m = new Map<string, string>();
@@ -205,6 +225,7 @@ export function CandidatesPage() {
 
   const filterActive =
     filter.currency != null ||
+    filter.index != null ||
     filter.region != null ||
     filter.strategy.length > 0;
   const prefsActive = prefValues != null;
@@ -246,6 +267,11 @@ export function CandidatesPage() {
         };
       })
       .filter((r): r is TableRow => r !== null)
+      .filter((r) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return r.name.toLowerCase().includes(q) || (r.fundName ?? "").toLowerCase().includes(q);
+      })
       .filter((r) => (az ? r.name.trim().toUpperCase().startsWith(az) : true))
       .filter((r) => {
         if (tab === "analyzed") return r.stage !== "rejected";
@@ -281,6 +307,7 @@ export function CandidatesPage() {
     prefValues,
     filterActive,
     az,
+    search,
     tab,
   ]);
 
@@ -429,26 +456,28 @@ export function CandidatesPage() {
           </b>{" "}
           · {rows.length} candidate{rows.length === 1 ? "" : "s"}
         </p>
-        <button
-          type="button"
-          className="btn btn-ico"
-          title="Filter"
-          aria-label="Filter"
-          onClick={() => setFilterOpen(true)}
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="cl-capactions">
+          <button
+            type="button"
+            className="btn btn-ico"
+            title="Filter"
+            aria-label="Filter"
+            onClick={() => setFilterOpen(true)}
           >
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-          </svg>
-        </button>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {(filterActive || prefsActive) && (
@@ -484,6 +513,28 @@ export function CandidatesPage() {
                 className="flt-x"
                 aria-label="Remove currency filter"
                 onClick={() => setFilter((f) => ({ ...f, currency: null }))}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          )}
+          {filter.index && (
+            <span className="flt-pill">
+              <span>Index : {filter.index}</span>
+              <button
+                className="flt-x"
+                aria-label="Remove index filter"
+                onClick={() => setFilter((f) => ({ ...f, index: null }))}
               >
                 <svg
                   width="13"

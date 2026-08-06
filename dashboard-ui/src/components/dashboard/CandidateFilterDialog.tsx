@@ -11,6 +11,10 @@ export interface CandidateFilterState {
 
 export const EMPTY_FILTER: CandidateFilterState = { currency: null, index: null, region: null, strategy: [] };
 
+/** sessionStorage key the dashboard persists its filter under — read by the
+ *  Peer Fit page to default its benchmark to the dashboard's Index pick. */
+export const CANDIDATE_FILTER_STORAGE_KEY = "candidates.filter";
+
 interface Props {
   open: boolean;
   onClose: () => void;

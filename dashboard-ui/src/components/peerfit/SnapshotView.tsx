@@ -2,6 +2,7 @@ import { useCandidatePeers, useRenderer } from "../../api/hooks";
 import type { RunParams } from "../../api/types";
 import { LoadingState } from "../common/LoadingState";
 import { ErrorState } from "../common/ErrorState";
+import { fmtMonth, obsCount } from "./WindowModal";
 
 interface SnapshotMetric {
   metric: string;
@@ -58,8 +59,18 @@ export function SnapshotView({ id, candidateName, params, selectedPeerKeys, onAd
   const kd = (metric: string) => kpiByMetric.get(metric)?.delta_vs_median ?? null;
   const kp = (metric: string) => kpiByMetric.get(metric)?.percentile ?? null;
 
+  // Analysis-window summary — params carry month-end dates ("2022-11-30");
+  // trim to "YYYY-MM" for the shared month formatter.
+  const winFrom = params.window_start?.slice(0, 7);
+  const winTo = params.window_end?.slice(0, 7);
+
   return (
     <div className="pl-view">
+      {winFrom && winTo && (
+        <div className="snap-window-note">
+          {obsCount(winFrom, winTo)} monthly obs · {fmtMonth(winFrom)} – {fmtMonth(winTo)}
+        </div>
+      )}
       <div className="snap-hero">
         <div className="snap-headline">
           <div className="snap-headline-l">Headline read</div>
@@ -124,7 +135,7 @@ export function SnapshotView({ id, candidateName, params, selectedPeerKeys, onAd
           <div className="snap-cell">
             <div className="sc-l">Beta</div>
             <div className="sc-v">{v("beta_benchmark").toFixed(2)}</div>
-            <div className="sc-d">vs {params.benchmark ?? "S&P 500 TR"}</div>
+            <div className="sc-d">vs {params.benchmark ?? "S&P 500 TR Index"}</div>
           </div>
           <div className="snap-cell">
             <div className="sc-l">Hit rate</div>

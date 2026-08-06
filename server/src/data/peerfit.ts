@@ -49,6 +49,9 @@ export interface CandPeer {
   fund: string;
   cand: string;
   id: string;
+  /** Fund key on the renderers service (matches its `candidate_peer_set`
+   *  examples, e.g. "C-2026-019::vega"). */
+  analytics_fund_id: string;
   ret: number;
   vol: number;
   dd: number;
@@ -56,9 +59,9 @@ export interface CandPeer {
 }
 
 export const CAND_PEERS: CandPeer[] = [
-  { key: "reyes", short: "Reyes", fund: "Vega Market Neutral", cand: "Sofia Reyes", id: "C-2026-019", ret: 9.2, vol: 8.8, dd: -7.8, corr: 0.44 },
-  { key: "chen", short: "Chen", fund: "Aris Quant L/S", cand: "Marcus Chen", id: "C-2026-021", ret: 10.6, vol: 8.9, dd: -7.1, corr: 0.61 },
-  { key: "okafor", short: "Okafor", fund: "Meridian Stat Arb", cand: "David Okafor", id: "C-2026-027", ret: 8.1, vol: 8.5, dd: -8.4, corr: 0.58 },
+  { key: "reyes", short: "Reyes", fund: "Vega Market Neutral", cand: "Sofia Reyes", id: "C-2026-019", analytics_fund_id: "C-2026-019::vega", ret: 9.2, vol: 8.8, dd: -7.8, corr: 0.44 },
+  { key: "chen", short: "Chen", fund: "Aris Quant L/S", cand: "Marcus Chen", id: "C-2026-021", analytics_fund_id: "C-2026-021::aris", ret: 10.6, vol: 8.9, dd: -7.1, corr: 0.61 },
+  { key: "okafor", short: "Okafor", fund: "Meridian Stat Arb", cand: "David Okafor", id: "C-2026-027", analytics_fund_id: "C-2026-027::meridian", ret: 8.1, vol: 8.5, dd: -8.4, corr: 0.58 },
 ];
 
 /** Deterministic pseudo-random correlation, seeded by row/col index — mirrors
@@ -200,13 +203,14 @@ function buildIdentity(candidate: string): { name: string; identity: Identity } 
   };
 }
 
-/** Resolve `params.candidate_peer_set` (a list of CAND_PEERS keys or fund
- *  names) to actual CandPeer records, de-duplicated, subject excluded. */
+/** Resolve `params.candidate_peer_set` (a list of CAND_PEERS keys, fund
+ *  names, or renderers-service fund keys like "C-2026-019::vega") to actual
+ *  CandPeer records, de-duplicated, subject excluded. */
 function resolveCandidatePeers(params: RunParams): CandPeer[] {
   const keys = params.candidate_peer_set;
   if (!keys || keys.length === 0) return [];
   const wanted = new Set(keys);
-  return CAND_PEERS.filter((c) => wanted.has(c.key) || wanted.has(c.fund));
+  return CAND_PEERS.filter((c) => wanted.has(c.key) || wanted.has(c.fund) || wanted.has(c.analytics_fund_id));
 }
 
 /** Candidates with a completed analytics run (see `data/panels.ts`) have a
@@ -382,24 +386,86 @@ export function buildD16b(candidate: string, params: RunParams): RendererEnvelop
 
 /* ── D1-7 — Correlations (quadrants) ─────────────────────────────────────── */
 
+/** Top-10 lists per quadrant, ported from the D1 design mock (Correlations
+ *  tab) — [name, correlation, beta, jensen_alpha]. Like the rest of this
+ *  file the numbers are illustrative; a completed analytics run supersedes
+ *  them via `loadRealPanel`. */
+type CorrFixture = [string, number, number, number];
+
+const LH_CORR_MOST: CorrFixture[] = [
+  ["LH — Qianyan 500 MN", 1.0, 1.0, 0.112],
+  ["LH — Maoyuan (MN)", 0.8, 0.9, 0.097],
+  ["LH — Minghong 500 MN", 0.7, 1.1, 0.084],
+  ["LH — Minghong CSI 500 Alpha", 0.7, 0.7, 0.079],
+  ["LH — Goku Enhance 500 Alpha", 0.7, 0.7, 0.076],
+  ["LH — Goku Onshore MN", 0.7, 1.1, 0.071],
+  ["LH — Qianyan CSI500 Alpha", 0.7, 0.6, 0.068],
+  ["LH — WizardQuant Onshore MN", 0.6, 0.8, 0.058],
+  ["LH — Mingshi Enhance500Alpha", 0.6, 0.5, 0.054],
+  ["LH — Jiukun Enhance500Alpha", 0.6, 0.5, 0.052],
+];
+
+const LH_CORR_LEAST: CorrFixture[] = [
+  ["LH — WAHA MENA Equity", -0.5, -0.3, 0.048],
+  ["LH — Perseverance ZLW", -0.4, -0.1, 0.042],
+  ["LH — Perseverance QGL", -0.4, -0.1, 0.04],
+  ["LH — Harvest Macro", -0.3, -0.2, 0.037],
+  ["LH — Evergreen CTA Trend", -0.3, -0.1, 0.035],
+  ["LH — Panview Greater China", -0.2, -0.1, 0.031],
+  ["LH — Lotus Credit Opportunities", -0.2, 0.0, 0.028],
+  ["LH — Meridian Event Driven", -0.1, 0.0, 0.024],
+  ["LH — Aurora Convert Arb", -0.1, -0.1, 0.021],
+  ["LH — Blue Willow Multi-Strat", -0.1, 0.1, 0.018],
+];
+
+const BB_CORR_MOST: CorrFixture[] = [
+  ["LH — Century Frontier Onshore MN", 0.7, 0.9, 0.064],
+  ["LH — Century Frontier 500 LO Alpha", 0.6, 0.6, 0.058],
+  ["LH — Axioma Europe Growth", 0.4, 1.6, 0.042],
+  ["LH — EU Momentum L/S", 0.4, 0.3, 0.039],
+  ["USDCNY Spot — 1 USD in CNY", 0.4, 0.6, 0.037],
+  ["Citi EU L/S Earnings Price Mom.", 0.4, 0.3, 0.034],
+  ["GS Japan Rate Sensitive Financials", 0.4, 0.1, 0.031],
+  ["GS US Domestic vs Intl Sales Basket", 0.3, 0.3, 0.029],
+  ["Axioma Global Local", 0.3, 0.1, 0.026],
+  ["S&P 500 Financial Sector TR", 0.3, 0.1, 0.023],
+];
+
+const BB_CORR_LEAST: CorrFixture[] = [
+  ["MSCI China A 50 Connect USD", -0.5, -0.2, 0.047],
+  ["GS China A 'VIP' Index", -0.5, -0.1, 0.045],
+  ["CSI 300 Consumer Staples TR", -0.4, -0.2, 0.041],
+  ["HSCEI Volatility Index", -0.4, -0.1, 0.038],
+  ["US 10Y Treasury Future", -0.3, -0.1, 0.034],
+  ["Gold Spot USD", -0.3, 0.0, 0.031],
+  ["MSCI EM Currency Index", -0.2, -0.1, 0.027],
+  ["Bloomberg Commodity TR", -0.2, 0.0, 0.024],
+  ["VIX Front-Month Future", -0.2, -0.1, 0.021],
+  ["iBoxx USD Liquid IG TR", -0.1, 0.0, 0.018],
+];
+
+const CORR_SCANNED_LH = 23;
+const CORR_SCANNED_BB = 412;
+
 export function buildD17(candidate: string, params: RunParams, source: string = "all"): RendererEnvelope {
-  const { name, identity } = buildIdentity(candidate);
-  const names = [name, ...PEER_FUNDS];
-  const matrix = buildCorrelationMatrix(names);
-  const subjectRow = matrix[0];
-  const ranked = names.map((n, i) => ({ n, corr: subjectRow[i] })).filter((_, i) => i !== 0);
-  const most = [...ranked].sort((a, b) => b.corr - a.corr).slice(0, 8);
-  const least = [...ranked].sort((a, b) => a.corr - b.corr).slice(0, 8);
+  const { identity } = buildIdentity(candidate);
+
+  const quadrant = (q: string, src: string, fixtures: CorrFixture[]) =>
+    fixtures.map(([name, correlation, beta, jensen_alpha]) => ({ quadrant: q, name, correlation, beta, jensen_alpha, source: src }));
 
   const rows: Record<string, unknown>[] = [];
   if (source === "all" || source === "lh") {
-    for (const r of most) rows.push({ quadrant: "lh_most", name: r.n, correlation: r.corr, beta: Math.round(r.corr * 0.9 * 100) / 100, jensen_alpha: null, source: "LH internal" });
-    for (const r of least) rows.push({ quadrant: "lh_least", name: r.n, correlation: r.corr, beta: Math.round(r.corr * 0.9 * 100) / 100, jensen_alpha: null, source: "LH internal" });
+    rows.push(...quadrant("lh_most", "LH internal", LH_CORR_MOST));
+    rows.push(...quadrant("lh_least", "LH internal", LH_CORR_LEAST));
+  }
+  if (source === "all" || source === "bb") {
+    rows.push(...quadrant("bb_most", "Bloomberg", BB_CORR_MOST));
+    rows.push(...quadrant("bb_least", "Bloomberg", BB_CORR_LEAST));
   }
   return {
     schema: rowSchema(["quadrant", "name", "correlation", "beta", "jensen_alpha", "source"]),
     rows,
-    attrs: { scanned: PEER_FUNDS.length, source: "D1-7 Peer Correlations" },
+    attrs: { scanned: CORR_SCANNED_LH, scanned_lh: CORR_SCANNED_LH, scanned_bb: CORR_SCANNED_BB, source: "D1-7 Peer Correlations" },
     identity,
   };
 }
@@ -572,7 +638,10 @@ export const PEERFIT_LABELS = new Set(["D1-5", "D1-6", "D1-6b", "D1-7", "D1-7b",
 
 export function buildPeerFitRenderer(label: string, candidate: string, params: RunParams, extra: { source?: string } = {}): RendererEnvelope {
   if (STATIC_PANEL_LABELS.has(label)) {
-    const real = loadRealPanel(candidate, label);
+    // Completed-run panel files key D1-7's provenance filter literally
+    // ("D1-7?source=lh") — prefer the variant, fall back to the bare label.
+    const variantKey = label === "D1-7" && extra.source ? `${label}?source=${extra.source}` : null;
+    const real = (variantKey ? loadRealPanel(candidate, variantKey) : null) ?? loadRealPanel(candidate, label);
     if (real) return real;
   }
   switch (label) {

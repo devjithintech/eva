@@ -143,6 +143,13 @@
 }
 
 /* snapshot */
+.snap-window-note {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  margin: -8px 0 18px;
+}
 .snap-hero {
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -397,11 +404,57 @@
 }
 
 /* correlations */
+.corr-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.corr-src {
+  display: flex;
+}
+.corr-src button {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 15px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.corr-src button + button {
+  border-left: none;
+}
+.corr-src button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.corr-src button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.corr-src button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.corr-src button:disabled {
+  color: var(--muted);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .corr-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   margin-bottom: 14px;
+}
+.corr-grid-1 {
+  grid-template-columns: 1fr;
+}
+.corr-empty {
+  padding: 18px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 .corr-box {
   border: 1px solid var(--line);
@@ -462,6 +515,11 @@
   width: 56px;
   font-weight: 600;
 }
+.corr-tbl td.cv.num {
+  width: 64px;
+  font-weight: 500;
+  color: var(--ink);
+}
 .hc {
   display: inline-block;
   padding: 2px 7px;
@@ -485,6 +543,43 @@
 .hc-g5 { background: #95cfb1; color: #0d3d21; }
 
 /* matrix */
+.matrix-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.matrix-legend {
+  width: 320px;
+  max-width: 45%;
+}
+.matrix-legend-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.matrix-legend-bar i {
+  flex: 1;
+}
+.matrix-legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.matrix-caption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted);
+}
 .matrix-wrap {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -511,10 +606,13 @@
   color: var(--ink);
   font-family: var(--sans);
   font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   position: sticky;
   left: 0;
   min-width: 170px;
+  z-index: 1;
 }
 .matrix th.col-h {
   background: var(--soft2);
@@ -523,11 +621,22 @@
   color: var(--ink);
   font-family: var(--sans);
   font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   height: 140px;
   white-space: nowrap;
   min-width: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  /* Inline axis is vertical here and the cell is rotated 180°, so aligning
+     to the inline start pins labels to the bottom edge (next to the cells);
+     names longer than the header ellipsize at the top — full name in title. */
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .matrix th.corner {
   background: var(--soft);
@@ -535,6 +644,8 @@
   top: 0;
   left: 0;
   min-width: 170px;
+  /* Above both sticky axes so scrolling headers pass underneath it. */
+  z-index: 3;
 }
 .matrix td {
   width: 34px;
@@ -1317,6 +1428,39 @@
 }
 
 /* ---------- candidate-peers tab ---------- */
+.cand-search {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.cand-search input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
+.cand-search input::placeholder {
+  color: var(--faint);
+}
+.cand-search input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.cand-search-count {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pf-cp);
+  white-space: nowrap;
+}
 .cand-list {
   display: flex;
   flex-direction: column;
@@ -1342,6 +1486,9 @@
   box-shadow: inset 3px 0 0 var(--primary);
   cursor: default;
 }
+.cand-pick > div:first-child {
+  min-width: 0;
+}
 .cand-pick .cp-name {
   font-size: 14px;
   color: var(--ink);
@@ -1353,12 +1500,75 @@
   font-size: 10.5px;
   color: var(--muted);
   margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cand-pick .cp-box {
   font-family: var(--mono);
   font-size: 16px;
   color: var(--pf-cp);
   flex: 0 0 auto;
+}
+.cand-pick .cp-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #c3d3d5;
+  border-radius: 4px;
+  background: #fff;
+  position: relative;
+}
+.cand-pick:hover .cp-check {
+  border-color: var(--pf-cp);
+}
+.cand-pick .cp-check.on {
+  background: var(--pf-cp);
+  border-color: var(--pf-cp);
+}
+.cand-pick .cp-check.on::after {
+  content: "";
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.cand-pick .cp-dot {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.custom-names-ta {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+  min-height: 130px;
+  outline: none;
+}
+.custom-names-ta::placeholder {
+  color: var(--faint);
+}
+.custom-names-ta:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.modal-foot-info b {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* ---------- analysis window modal ---------- */

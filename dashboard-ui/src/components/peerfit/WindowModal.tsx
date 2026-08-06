@@ -23,11 +23,11 @@ function shift(ym: string, delta: number): string {
   const nm = ((total % 12) + 12) % 12;
   return `${ny}-${String(nm + 1).padStart(2, "0")}`;
 }
-function fmt(ym: string): string {
+export function fmtMonth(ym: string): string {
   const [y, m] = ym.split("-");
   return `${MONTHS[Number(m) - 1]}-${y.slice(2)}`;
 }
-function obsCount(f: string, t: string): number {
+export function obsCount(f: string, t: string): number {
   const [fy, fm] = f.split("-").map(Number);
   const [ty, tm] = t.split("-").map(Number);
   return (ty - fy) * 12 + (tm - fm);
@@ -69,7 +69,7 @@ export function WindowModal({ open, onClose, value, onApply }: Props) {
         <div className="modal-head">
           <div className="modal-title">
             Analysis window
-            <small>MONTHLY RETURNS · {fmt(WIN_MIN)} – {fmt(WIN_MAX)} AVAILABLE</small>
+            <small>MONTHLY RETURNS · {fmtMonth(WIN_MIN)} – {fmtMonth(WIN_MAX)} AVAILABLE</small>
           </div>
           <button className="modal-close" aria-label="Close" onClick={onClose}>
             ×
@@ -129,7 +129,7 @@ export function WindowModal({ open, onClose, value, onApply }: Props) {
               "Start month must be on or before end month."
             ) : (
               <>
-                <strong>{obsCount(draft.from, draft.to)} monthly obs</strong> · {fmt(draft.from)} – {fmt(draft.to)}
+                <strong>{obsCount(draft.from, draft.to)} monthly obs</strong> · {fmtMonth(draft.from)} – {fmtMonth(draft.to)}
               </>
             )}
           </div>

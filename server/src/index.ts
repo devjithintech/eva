@@ -10,6 +10,7 @@ import { AguiStream } from "./agui/stream.js";
 import { runAgent } from "./agui/runAgent.js";
 import { bff } from "./bff/routes.js";
 import { openapi } from "./bff/openapi.js";
+import { primeDataset } from "./data/sqlDataset.js";
 
 const app = express();
 app.use(cors());
@@ -23,7 +24,18 @@ app.get("/health", (_req, res) => {
 app.get("/api/openapi.json", (_req, res) => res.json(openapi));
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: "LightHouse BFF API" }));
 
-/** BFF: read-only REST over server/data/*.json for the web UI. */
+/** Optional API-key gate for the BFF data endpoints (docs stay open). Unset
+ *  D1_API_KEY = open, for local dev. The web UI is covered by the Vite dev
+ *  proxy injecting the header (see dashboard-ui/vite.config.ts). */
+app.use("/api", (req, res, next) => {
+  if (!config.d1ApiKey) return next();
+  const bearer = req.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (req.get("x-api-key") === config.d1ApiKey || bearer === config.d1ApiKey) return next();
+  res.status(401).json({ error: "unauthorized", message: "Missing or invalid API key (x-api-key)" });
+});
+
+/** BFF: read-only REST for the web UI — candidate data served from SQL Server
+ *  (dbo.Candidates + analytics tables; data.json is a fallback). */
 app.use("/api", bff);
 
 /** Models the client may select right now (only providers with keys + mock). */
@@ -106,9 +118,14 @@ app.post("/agent", async (req, res) => {
   await runAgent(input, stream, controller.signal);
 });
 
+/** Load the candidate dataset (SQL Server, or data.json fallback) before
+ *  accepting traffic — the BFF's builders read it synchronously. */
+const dataset = await primeDataset();
+
 app.listen(config.port, () => {
   const model = resolveModel().entry;
   console.log(`▸ LightHouse agent server on http://localhost:${config.port}`);
+  console.log(`  candidate data: ${dataset.source} (${dataset.count} candidates)`);
   console.log(`  default model: ${model.label} (${model.providerId})`);
   console.log(`  available: ${availableModels().map((m) => m.id).join(", ")}`);
   const tts = ttsStatus();

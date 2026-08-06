@@ -5,10 +5,8 @@
  * for *which* entities; the builders here turn that intent into a fully
  * populated artifact payload. Data ported from the original LightHouse demo.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { funnelCounts, getStage } from "./pipeline.js";
+import { getDataset, type RawDataset } from "./sqlDataset.js";
 import { loadCandidatePanel } from "./panels.js";
 import type {
   AnalystFlagsPayload,
@@ -26,19 +24,11 @@ import type {
   CandidatePoolPayload,
 } from "./types.js";
 
-/** The live dataset the BFF serves. Read fresh so edits show without a restart.
- *  Resolves `server/data/data.json` in both dev (src/) and prod (dist/). */
-const DATA_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/data.json");
-interface RawDataset {
-  count: number;
-  candidates: Record<string, Record<string, unknown>>;
-}
+/** The live dataset the BFF serves — from SQL Server (dbo.Candidates), cached
+ *  in memory with a background TTL refresh; data.json is only a fallback when
+ *  the DB is unreachable. See `sqlDataset.ts`. */
 function loadDataset(): RawDataset {
-  try {
-    return JSON.parse(readFileSync(DATA_FILE, "utf8")) as RawDataset;
-  } catch {
-    return { count: 0, candidates: {} };
-  }
+  return getDataset();
 }
 /** Coerce a value to a finite number, else null. */
 export const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);

@@ -135,10 +135,13 @@ export interface ComparisonPayload {
 export interface RunParams {
   peer_group?: string;
   peer_set?: string[];
+  /** Month-end dates ("2022-11-30") — monthly return series are dated at month end. */
   window_start?: string;
   window_end?: string;
   benchmark?: string;
   risk_free?: string;
+  /** Return-series providers feeding the Peer-Fit stats (e.g. ["lh_internal", "bloomberg"]). */
+  datasets?: string[];
   allocation_pct?: number;
   gross_exposure?: number;
   net_exposure?: number;
@@ -157,6 +160,27 @@ export interface Identity {
   fund_name: string | null;
   candidate_id: string | null;
   pm_id: string | null;
+}
+
+/** One node of the fund hierarchy (`GET /fund-hierarchy`, renderers service). */
+export interface FundHierarchyRow {
+  level: number;
+  fund_id: number;
+  name: string;
+  fund: string;
+  map_number: string | null;
+  parent_fund_id: number | null;
+  parent_fund: string | null;
+  parent_map_number: string | null;
+  is_active: boolean;
+}
+
+export interface FundHierarchyResponse {
+  as_of: string;
+  recent_days: number;
+  count: number;
+  active_count: number;
+  rows: FundHierarchyRow[];
 }
 
 /** Universal renderer response envelope (per the Frontend API Guide). */
@@ -182,6 +206,9 @@ export interface CandPeer {
   fund: string;
   cand: string;
   id: string;
+  /** Fund key on the renderers service (e.g. "C-2026-019::vega") — what
+   *  `candidate_peer_set` must carry. */
+  analytics_fund_id?: string;
   ret: number;
   vol: number;
   dd: number;
